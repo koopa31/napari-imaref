@@ -9,13 +9,6 @@ from napari.utils.notifications import show_info
 
 
 # Fonction de calcul qui sera lancée après la validation des segments
-def calculer_trucs(segment1, segment2):
-    longueur1 = np.linalg.norm(segment1[1] - segment1[0])
-    longueur2 = np.linalg.norm(segment2[1] - segment2[0])
-    print(f"Longueur du segment 1 : {longueur1}")
-    print(f"Longueur du segment 2 : {longueur2}")
-    return longueur1, longueur2
-
 def calcul_repere(layer_shape):
     """
     Calcule les coordonees des vecteurs et de l'origine du
@@ -126,9 +119,6 @@ def valider_segments(viewer: napari.Viewer):
     if len(segments) < 2:
         show_info("Vous devez tracer deux segments.")
     else:
-        # segment1 = segments[0]
-        # segment2 = segments[1]
-        # data = calculer_trucs(segment1, segment2)
         data = calcul_repere(segments)
         save_data_to_csv(image_paths[current_image_index], data)
         update_instructions(4)
