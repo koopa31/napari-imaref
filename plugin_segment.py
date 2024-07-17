@@ -16,6 +16,49 @@ def calculer_trucs(segment1, segment2):
     print(f"Longueur du segment 2 : {longueur2}")
     return longueur1, longueur2
 
+def calcul_repere(layer_shape):
+    """
+    Calcule les coordonees des vecteurs et de l'origine du
+    nouveau repere
+
+    Args:
+    layer_shape(array): coordonees de 2 segments :
+    array([[za1,ya1,xa1],
+    [za2,ya2,xa2]],
+    [[zb1,yb1,xb1],
+    [zb2,yb2,xb2]]))
+
+    Returns:
+    - origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
+    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
+    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
+    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
+    """
+    
+    segment_A = layer_shape[0]
+    segment_B = layer_shape[1]
+
+    # Calcul du segment C et de son milieu (Origine du repère)
+    millieu_A = (segment_A[0] + segment_A[1]) / 2
+    millieu_B = (segment_B[0] + segment_B[1]) / 2
+    segment_C = np.array([millieu_A,millieu_B])
+    Origine = (segment_C[0] + segment_C[1]) / 2
+
+
+    # Calcul du vecteur unitaire w (z)
+    w = millieu_B - millieu_A
+    w = w / np.linalg.norm(w)
+
+    # Calcul du vecteur unitaire u (x)
+    v_prim = segment_A[1] - segment_A[0]
+    v_prim = v_prim / np.linalg.norm(v_prim)
+    u = np.cross(w,v_prim)
+    u = u / np.linalg.norm(u)
+
+    # Calcul du vecteur unitaire v (y)
+    v = np.cross(u,w)
+
+    return (Origine, u, v, w)
 
 # Fonction pour mettre à jour les instructions
 def update_instructions(step):
@@ -71,7 +114,7 @@ def save_data_to_csv(image_path, data):
     csv_filename = os.path.splitext(image_path)[0] + '.csv'
     with open(csv_filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(['Segment 1 Longueur', 'Segment 2 Longueur'])
+        csv_writer.writerow(['Origine', 'u', 'v', 'w'])
         csv_writer.writerow(data)
 
 
@@ -83,9 +126,10 @@ def valider_segments(viewer: napari.Viewer):
     if len(segments) < 2:
         show_info("Vous devez tracer deux segments.")
     else:
-        segment1 = segments[0]
-        segment2 = segments[1]
-        data = calculer_trucs(segment1, segment2)
+        # segment1 = segments[0]
+        # segment2 = segments[1]
+        # data = calculer_trucs(segment1, segment2)
+        data = calcul_repere(segments)
         save_data_to_csv(image_paths[current_image_index], data)
         update_instructions(4)
         next_image(viewer)
