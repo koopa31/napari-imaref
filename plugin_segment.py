@@ -1,6 +1,6 @@
 import napari
 from magicgui import magicgui
-from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton
+from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame
 import numpy as np
 from skimage.io import imread
 import os
@@ -115,12 +115,21 @@ def create_combined_widget(viewer):
     valider_button.clicked.connect(lambda: valider_segments(viewer))
     layout.addWidget(valider_button)
 
-    instructions_label = QLabel("Instructions:")
-    layout.addWidget(instructions_label)
+    instructions_frame = QFrame()
+    instructions_frame.setFrameShape(QFrame.Box)
+    instructions_frame.setFrameShadow(QFrame.Raised)
+    instructions_layout = QVBoxLayout(instructions_frame)
+
+    instructions_label = QLabel("INSTRUCTIONS:")
+    instructions_label.setStyleSheet("font-size: 22px; font-family: Arial;")
+    instructions_layout.addWidget(instructions_label)
 
     global instructions_text
     instructions_text = QLabel("")
-    layout.addWidget(instructions_text)
+    instructions_text.setStyleSheet("font-size: 16px; font-family: Arial;")
+    instructions_layout.addWidget(instructions_text)
+
+    layout.addWidget(instructions_frame)
 
     combined_widget.setLayout(layout)
     update_instructions(1)
