@@ -111,6 +111,33 @@ def save_data_to_csv(image_path, data):
         csv_writer.writerow(data)
 
 
+def draw_axes(Origine, u, v, w):
+     """
+    Dessine les 3 axes d'un repère
+
+    Args:
+    - Origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
+    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
+    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
+    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).    
+    """
+     
+     # Dessine l'axe x
+     segment_u = np.array([Origine, Origine+50*u])
+     shapes_layer = viewer.add_shapes(segment_u, shape_type='line', edge_width=1, 
+                                     edge_color='blue')
+     # Dessine l'axe y
+     segment_v = np.array([Origine, Origine+50*v])
+     shapes_layer = viewer.add_shapes(segment_v, shape_type='line', edge_width=1, 
+                                     edge_color='red')
+     # Dessine l'axe z
+     segment_w = np.array([Origine, Origine+50*w])
+     shapes_layer = viewer.add_shapes(segment_w, shape_type='line', edge_width=1, 
+                                     edge_color='green')
+    
+    
+
+
 # Fonction pour valider les segments
 @magicgui(call_button="Calcul des coordonnées")
 def valider_segments(viewer: napari.Viewer):
