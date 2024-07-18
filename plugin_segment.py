@@ -102,6 +102,8 @@ def next_image(viewer):
         load_image(viewer, image_paths[current_image_index])
         update_instructions(1)
         image_index.setText(str(current_image_index + 1))
+        # Make sure shapes is int the right drawing mode
+        viewer.layers["Shapes"].mode = "add_line"
     else:
         show_info("Toutes les images ont été traitées.")
 
@@ -119,6 +121,8 @@ def previous_image(viewer):
         load_image(viewer, image_paths[current_image_index])
         update_instructions(1)
         image_index.setText(str(current_image_index + 1))
+        # Make sure shapes is int the right drawing mode
+        viewer.layers["Shapes"].mode = "add_line"
     else:
         show_info("Vous êtes déjà à la première image.")
 
@@ -195,7 +199,7 @@ def valider_segments(viewer: napari.Viewer):
     """
     shapes_layer = viewer.layers['Shapes']
     segments = shapes_layer.data
-    if len(segments) < 2:
+    if len(segments) != 2:
         show_info("Vous devez tracer deux segments.")
     else:
         data = calcul_repere(segments)
