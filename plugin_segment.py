@@ -34,13 +34,13 @@ def calcul_repere(layer_shape):
     segment_B = layer_shape[1]
 
     # Calcul du segment C et de son milieu (Origine du repère)
-    millieu_A = (segment_A[0] + segment_A[1]) / 2
-    millieu_B = (segment_B[0] + segment_B[1]) / 2
-    segment_C = np.array([millieu_A, millieu_B])
-    Origine = (segment_C[0] + segment_C[1]) / 2
+    milieu_A = (segment_A[0] + segment_A[1]) / 2
+    milieu_B = (segment_B[0] + segment_B[1]) / 2
+    segment_C = np.array([milieu_A, milieu_B])
+    origine = (segment_C[0] + segment_C[1]) / 2
 
     # Calcul du vecteur unitaire w (z)
-    w = millieu_B - millieu_A
+    w = milieu_B - milieu_A
     w = w / np.linalg.norm(w)
 
     # Calcul du vecteur unitaire u (x)
@@ -52,11 +52,16 @@ def calcul_repere(layer_shape):
     # Calcul du vecteur unitaire v (y)
     v = np.cross(u, w)
 
-    return (Origine, u, v, w)
+    return origine, u, v, w
 
 
 # Fonction pour mettre à jour les instructions
 def update_instructions(step):
+    """
+    Update the instruction as a function of the step value
+    :param step:
+    :return:
+    """
     if step == 1:
         instructions_text.setText("Tracez le premier segment.")
     elif step == 2:
@@ -69,6 +74,12 @@ def update_instructions(step):
 
 # Fonction pour charger une image et créer un layer de shapes
 def load_image(viewer, image_path):
+    """
+    Loads the image given its path and creates an empty shapes layer.
+    :param viewer:
+    :param image_path:
+    :return:
+    """
     image = imread(image_path)
     viewer.add_image(image, name='Image 3D')
     shapes_layer = viewer.add_shapes(ndim=3, name='Shapes')
@@ -79,6 +90,11 @@ def load_image(viewer, image_path):
 
 # Fonction pour gérer le changement d'image après validation
 def next_image(viewer):
+    """
+    Load the next image.
+    :param viewer:
+    :return:
+    """
     global current_image_index, image_paths
     if current_image_index < len(image_paths) - 1:
         current_image_index += 1
@@ -91,6 +107,11 @@ def next_image(viewer):
 
 
 def previous_image(viewer):
+    """
+    Load the previous image.
+    :param viewer:
+    :return:
+    """
     global current_image_index, image_paths
     if current_image_index > 0:
         current_image_index -= 1
@@ -104,6 +125,11 @@ def previous_image(viewer):
 
 # Fonction pour sélectionner un dossier et charger la première image
 def select_folder_and_load_image(viewer):
+    """
+    Opens a dialog to select a folder containing the images to process.
+    :param viewer:
+    :return:
+    """
     global image_paths, current_image_index
     folder = QFileDialog.getExistingDirectory(None, "Select Folder")
     if folder:
@@ -121,6 +147,12 @@ def select_folder_and_load_image(viewer):
 
 # Fonction pour sauvegarder les données dans un fichier CSV
 def save_data_to_csv(image_path, data):
+    """
+    Saves the  computed origin and vectors in a csv file which name is the same as the one of the image.
+    :param image_path:
+    :param data:
+    :return:
+    """
     csv_filename = os.path.splitext(image_path)[0] + '.csv'
     with open(csv_filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
@@ -156,6 +188,11 @@ def draw_axes(viewer, Origine, u, v, w):
 # Fonction pour valider les segments
 @magicgui(call_button="Calcul des coordonnées")
 def valider_segments(viewer: napari.Viewer):
+    """
+    Validate the drawn segments and computes the new basis.
+    :param viewer:
+    :return:
+    """
     shapes_layer = viewer.layers['Shapes']
     segments = shapes_layer.data
     if len(segments) < 2:
@@ -172,6 +209,11 @@ def valider_segments(viewer: napari.Viewer):
 
 # Fonction pour suivre les changements dans le layer de shapes
 def on_shapes_update(event):
+    """
+    Each time a shape is drawn or deleted, update the instruction step.
+    :param event:
+    :return:
+    """
     shapes_layer = event.source
     if len(shapes_layer.data) == 1:
         update_instructions(2)
@@ -183,6 +225,11 @@ def on_shapes_update(event):
 
 # Fonction pour créer un widget combiné
 def create_combined_widget(viewer):
+    """
+    The widget buttons.
+    :param viewer:
+    :return:
+    """
     combined_widget = QWidget()
     layout = QVBoxLayout()
 
