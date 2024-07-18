@@ -55,6 +55,29 @@ def calcul_repere(layer_shape):
     return origine, u, v, w
 
 
+# 
+def nouvelles_coord(origine, vecteur_u, vecteur_v, vecteur_w, Point):
+    """
+    Calcule les nouvelles coordonees de Point à partir du repère (O,x,y,z)
+
+    Args:
+    - origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
+    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
+    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
+    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
+    - Point (tuple): Coordonnées du point dans l'ancien repère (x0, y0, z0).
+    
+    Returns:
+    - New_point (tuple): Coordonnées du point dans le nouveau repère (x0, y0, z0).
+    """
+
+    matrix = np.array([vecteur_u, vecteur_v, vecteur_w])
+    matrix_inv = np.linalg.inv(matrix)
+    New_point = matrix_inv @ (Point - origine)
+
+    return New_point
+
+
 # Fonction pour mettre à jour les instructions
 def update_instructions(step):
     """
