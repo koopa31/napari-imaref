@@ -248,5 +248,9 @@ viewer = napari.Viewer()
 combined_widget = create_combined_widget(viewer)
 viewer.window.add_dock_widget(combined_widget, area='right')
 
+# Ajout d'une image d'accueil pour la fantaisie
+im_accueil = imread("Image/Image_accueil.webp")
+viewer.add_image(im_accueil)
+
 # Lancer l'application Napari
 napari.run()
