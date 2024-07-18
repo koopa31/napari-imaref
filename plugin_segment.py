@@ -300,7 +300,9 @@ combined_widget = create_combined_widget(viewer)
 viewer.window.add_dock_widget(combined_widget, area='right')
 
 # Ajout d'une image d'accueil pour la fantaisie
-im_accueil = imread("Image/Image_accueil.webp")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+image_path = os.path.join(script_dir, "Image", "Image_accueil.webp")
+im_accueil = imread(image_path)
 viewer.add_image(im_accueil)
 
 # Lancer l'application Napari
