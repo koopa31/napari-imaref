@@ -1,7 +1,6 @@
 import napari
 from magicgui import magicgui
-from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, \
-    QLineEdit
+from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, QLineEdit
 from qtpy.QtCore import Qt
 import numpy as np
 from skimage.io import imread
@@ -9,185 +8,143 @@ import os
 import csv
 from napari.utils.notifications import show_info
 
-
-# Fonction de calcul qui sera lancée après la validation des segments
-def calcul_repere(layer_shape):
+# Fonction de calcul pour le repère à partir des points
+def calcul_repere(points):
     """
-    Calcule les coordonees des vecteurs et de l'origine du
-    nouveau repere
+    Calcule les coordonnées des vecteurs et de l'origine du
+    nouveau repère basé sur le cône de révolution
 
     Args:
-    layer_shape(array): coordonees de 2 segments :
-    array([[za1,ya1,xa1],
-    [za2,ya2,xa2]],
-    [[zb1,yb1,xb1],
-    [zb2,yb2,xb2]]))
+    points (array): coordonnées des points :
+    array([
+        [z1,y1,x1], # Sommet du cône
+        [z2,y2,x2], # Point pour le plan
+        [z3,y3,x3], # Point pour le plan
+        [z4,y4,x4], # Point sur la base
+    ])
 
     Returns:
-    - origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
+    - origine (tuple): Coordonnées de l'origine du nouveau repère (centre de la base).
     - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
     - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
     - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
     """
+    sommet = points[0]
+    point_plan_1 = points[1]
+    point_plan_2 = points[2]
+    point_base = points[3]
 
-    segment_A = layer_shape[0]
-    segment_B = layer_shape[1]
+    # Calcul du vecteur normal au plan défini par les points 2 et 3
+    vecteur_v = np.cross(point_plan_2 - point_plan_1, sommet - point_plan_1)
+    vecteur_v = vecteur_v / np.linalg.norm(vecteur_v)
 
-    # Calcul du segment C et de son milieu (Origine du repère)
-    milieu_A = (segment_A[0] + segment_A[1]) / 2
-    milieu_B = (segment_B[0] + segment_B[1]) / 2
-    segment_C = np.array([milieu_A, milieu_B])
-    origine = (segment_C[0] + segment_C[1]) / 2
+    # Calcul du point symétrique de point_base par rapport au plan
+    distance_au_plan = np.dot(point_base - point_plan_1, vecteur_v)
+    point_sym = point_base - 2 * distance_au_plan * vecteur_v
 
-    # Calcul du vecteur unitaire w (z)
-    w = milieu_B - milieu_A
-    w = w / np.linalg.norm(w)
+    # Calcul du centre de la base (milieu entre point_base et point_sym)
+    centre_base = (point_base + point_sym) / 2
 
-    # Calcul du vecteur unitaire u (x)
-    v_prim = segment_A[1] - segment_A[0]
-    v_prim = v_prim / np.linalg.norm(v_prim)
-    u = np.cross(w, v_prim)
-    u = u / np.linalg.norm(u)
+    # Calcul du vecteur unitaire y (axe de la hauteur, du centre de la base au sommet)
+    vecteur_y = sommet - centre_base
+    vecteur_y = vecteur_y / np.linalg.norm(vecteur_y)
 
-    # Calcul du vecteur unitaire v (y)
-    v = np.cross(u, w)
+    # Calcul du vecteur unitaire u (dans le plan de la base, direction de la base)
+    vecteur_u = point_base - centre_base
+    vecteur_u = vecteur_u / np.linalg.norm(vecteur_u)
 
-    return origine, u, v, w
+    # Calcul du vecteur unitaire w (perpendiculaire aux deux autres)
+    vecteur_w = np.cross(vecteur_u, vecteur_y)
+    vecteur_w = vecteur_w / np.linalg.norm(vecteur_w)
 
+    return centre_base, vecteur_u, vecteur_y, vecteur_w
 
-# 
-def nouvelles_coord(origine, vecteur_u, vecteur_v, vecteur_w, Point):
+# Fonction pour dessiner le cône de révolution
+def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
     """
-    Calcule les nouvelles coordonees de Point à partir du repère (O,x,y,z)
+    Dessine une représentation approximative du cône de révolution.
 
     Args:
-    - origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
-    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
-    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
-    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
-    - Point (tuple): Coordonnées du point dans l'ancien repère (x0, y0, z0).
-    
-    Returns:
-    - New_point (tuple): Coordonnées du point dans le nouveau repère (x0, y0, z0).
+    - sommet (array): Coordonnées du sommet du cône.
+    - centre_base (array): Coordonnées du centre de la base du cône.
+    - point_base (array): Coordonnées d'un point sur la base.
+    - vecteur_u (array): Vecteur directeur de la base.
+    - vecteur_w (array): Vecteur perpendiculaire pour former le plan de la base.
     """
+    # Calcul du rayon de la base à partir du point_base
+    rayon_base = np.linalg.norm(point_base - centre_base)
 
-    matrix = np.array([vecteur_u, vecteur_v, vecteur_w])
-    matrix_inv = np.linalg.inv(matrix)
-    New_point = matrix_inv @ (Point - origine)
+    # Paramètres pour le dessin du cercle de la base
+    angles = np.linspace(0, 2 * np.pi, 36)  # 36 points pour approximer le cercle
 
-    return New_point
+    # Points de la base
+    base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in angles]
+    base_points = np.array(base_points)
 
+    # Ajouter le cercle de la base
+    viewer.add_shapes(data=base_points, shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow', opacity=0.3, name='Base du cône')
+
+    # Ajouter les lignes reliant le sommet à la base
+    for point in base_points:
+        viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow', name='Arête du cône')
 
 # Fonction pour mettre à jour les instructions
 def update_instructions(step):
     """
-    Update the instruction as a function of the step value
+    Met à jour les instructions en fonction de l'étape actuelle
     :param step:
     :return:
     """
     if step == 1:
-        instructions_text.setText("Tracez le premier segment.")
+        instructions_text.setText("Placez le sommet du cône.")
     elif step == 2:
-        instructions_text.setText("Tracez le deuxième segment.")
+        instructions_text.setText("Placez le premier point pour définir le plan.")
     elif step == 3:
+        instructions_text.setText("Placez le deuxième point pour définir le plan.")
+    elif step == 4:
+        instructions_text.setText("Placez un point sur le périmètre de la base.")
+    elif step == 5:
         instructions_text.setText("Cliquez sur 'Calcul des coordonnées' pour lancer les calculs.")
     else:
         instructions_text.setText("Instructions complètes.")
 
-
-# Fonction pour charger une image et créer un layer de shapes
-def load_image(viewer, image_path):
+# Fonction pour suivre les changements dans le calque de points
+def on_points_update(event):
     """
-    Loads the image given its path and creates an empty shapes layer.
-    :param viewer:
-    :param image_path:
+    Met à jour les instructions en fonction du nombre de points placés.
+    :param event:
     :return:
     """
-    image = imread(image_path)
-    viewer.add_image(image, name='Image 3D')
-    shapes_layer = viewer.add_shapes(ndim=3, name='Shapes')
-    shapes_layer.mode = 'add_line'
-    shapes_layer.events.data.connect(on_shapes_update)
-    viewer.dims.ndisplay = 2
+    points_layer = event.source
+    num_points = len(points_layer.data)
+    update_instructions(num_points + 1)
 
-
-# Fonction pour gérer le changement d'image après validation
-def next_image(viewer):
+# Fonction pour valider les points et calculer le repère
+@magicgui(call_button="Calcul des coordonnées")
+def valider_points(viewer: napari.Viewer):
     """
-    Load the next image.
+    Valide les points placés et calcule le nouveau repère
     :param viewer:
     :return:
     """
-    global current_image_index, image_paths
-    if current_image_index < len(image_paths) - 1:
-        current_image_index += 1
-        viewer.layers.clear()
-        load_image(viewer, image_paths[current_image_index])
-        update_instructions(1)
-        image_index.setText(str(current_image_index + 1))
-        # Make sure shapes is int the right drawing mode
-        viewer.layers["Shapes"].mode = "add_line"
+    points_layer = viewer.layers['Points']
+    points = points_layer.data
+    if len(points) != 4:
+        show_info("Vous devez placer quatre points.")
     else:
-        show_info("Toutes les images ont été traitées.")
-
-
-def previous_image(viewer):
-    """
-    Load the previous image.
-    :param viewer:
-    :return:
-    """
-    global current_image_index, image_paths
-    if current_image_index > 0:
-        current_image_index -= 1
-        viewer.layers.clear()
-        load_image(viewer, image_paths[current_image_index])
-        update_instructions(1)
-        image_index.setText(str(current_image_index + 1))
-        # Make sure shapes is int the right drawing mode
-        viewer.layers["Shapes"].mode = "add_line"
-    else:
-        show_info("Vous êtes déjà à la première image.")
-
-
-# Fonction pour sélectionner un dossier et charger la première image
-def select_folder_and_load_image(viewer):
-    """
-    Opens a dialog to select a folder containing the images to process.
-    :param viewer:
-    :return:
-    """
-    global image_paths, current_image_index
-    folder = QFileDialog.getExistingDirectory(None, "Select Folder")
-    if folder:
-        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if
-                       f.endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff', 'TIF'))]
-        current_image_index = 0
-        if image_paths:
-            viewer.layers.clear()
-            load_image(viewer, image_paths[current_image_index])
-            update_instructions(1)
-            image_index.setText(str(current_image_index + 1))
+        origine, u, v, w = calcul_repere(points)
+        save_data_to_csv(image_paths[current_image_index], (origine, u, v, w))
+        update_instructions(6)
+        if show_cone_checkbox.isChecked():
+            draw_cone(viewer, points[0], origine, points[3], u, w)
+        if show_axes_checkbox.isChecked():
+            draw_axes(viewer, origine, u, v, w)
+            draw_origin(viewer, origine)
         else:
-            show_info("Aucune image trouvée dans le dossier.")
+            next_image(viewer)
 
-
-# Fonction pour sauvegarder les données dans un fichier CSV
-def save_data_to_csv(image_path, data):
-    """
-    Saves the  computed origin and vectors in a csv file which name is the same as the one of the image.
-    :param image_path:
-    :param data:
-    :return:
-    """
-    csv_filename = os.path.splitext(image_path)[0] + '.csv'
-    with open(csv_filename, 'w', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(['Origine', 'u', 'v', 'w'])
-        csv_writer.writerow(data)
-
-
-def draw_axes(viewer, Origine, u, v, w):
+# Fonction pour dessiner le repère
+def draw_axes(viewer, origine, u, v, w):
     """
     Dessine les 3 axes d'un repère
 
@@ -198,62 +155,117 @@ def draw_axes(viewer, Origine, u, v, w):
     - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
     """
     # Dessine l'axe x
-    segment_u = np.array([Origine, Origine + 50 * u])
+    segment_u = np.array([origine, origine + 50 * u])
     viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue', name='Axe X')
 
     # Dessine l'axe y
-    segment_v = np.array([Origine, Origine + 50 * v])
+    segment_v = np.array([origine, origine + 50 * v])
     viewer.add_shapes(segment_v, shape_type='line', edge_width=1, edge_color='red', name='Axe Y')
 
     # Dessine l'axe z
-    segment_w = np.array([Origine, Origine + 50 * w])
+    segment_w = np.array([origine, origine + 50 * w])
     viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green', name='Axe Z')
 
     viewer.dims.ndisplay = 3
 
-
-# Fonction pour valider les segments
-@magicgui(call_button="Calcul des coordonnées")
-def valider_segments(viewer: napari.Viewer):
+# Fonction pour dessiner l'origine du repère
+def draw_origin(viewer, origine):
     """
-    Validate the drawn segments and computes the new basis.
+    Dessine un point rouge à l'origine du repère.
+
+    Args:
+    - origine (tuple): Coordonnées de l'origine du repère (centre de la base du cône).
+    """
+    viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
+
+# Fonction pour sauvegarder les données dans un fichier CSV
+def save_data_to_csv(image_path, data):
+    """
+    Sauvegarde les données calculées dans un fichier CSV
+
+    Args:
+    - image_path (str): Chemin de l'image en cours de traitement.
+    - data (tuple): Données contenant l'origine et les vecteurs u, v, w.
+    """
+    csv_filename = os.path.splitext(image_path)[0] + '.csv'
+    with open(csv_filename, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(['Origine', 'u', 'v', 'w'])
+        csv_writer.writerow(data)
+
+# Fonction pour charger une image et créer un layer de points
+def load_image(viewer, image_path):
+    """
+    Charge une image et ajoute un calque de points pour la saisie des points.
+    :param viewer:
+    :param image_path:
+    :return:
+    """
+    image = imread(image_path)
+    viewer.add_image(image, name='Image 3D')
+    points_layer = viewer.add_points(ndim=3, name='Points')
+    points_layer.mode = 'add'
+    points_layer.events.data.connect(on_points_update)  # Connecte l'événement de mise à jour
+    viewer.dims.ndisplay = 2
+
+# Fonction pour sélectionner un dossier et charger la première image
+def select_folder_and_load_image(viewer):
+    """
+    Ouvre une boîte de dialogue pour sélectionner un dossier contenant les images à traiter.
     :param viewer:
     :return:
     """
-    shapes_layer = viewer.layers['Shapes']
-    segments = shapes_layer.data
-    if len(segments) != 2:
-        show_info("Vous devez tracer deux segments.")
-    else:
-        data = calcul_repere(segments)
-        save_data_to_csv(image_paths[current_image_index], data)
-        update_instructions(4)
-        if show_axes_checkbox.isChecked():
-            draw_axes(viewer, *data)
+    global image_paths, current_image_index
+    folder = QFileDialog.getExistingDirectory(None, "Sélectionner Dossier")
+    if folder:
+        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+        current_image_index = 0
+        if image_paths:
+            viewer.layers.clear()
+            load_image(viewer, image_paths[current_image_index])
+            update_instructions(1)
+            image_index.setText(str(current_image_index + 1))
         else:
-            next_image(viewer)
+            show_info("Aucune image trouvée dans le dossier.")
 
-
-# Fonction pour suivre les changements dans le layer de shapes
-def on_shapes_update(event):
+# Fonction pour charger l'image suivante
+def next_image(viewer):
     """
-    Each time a shape is drawn or deleted, update the instruction step.
-    :param event:
+    Charge l'image suivante.
+    :param viewer:
     :return:
     """
-    shapes_layer = event.source
-    if len(shapes_layer.data) == 1:
-        update_instructions(2)
-    elif len(shapes_layer.data) == 0:
+    global current_image_index, image_paths
+    if current_image_index < len(image_paths) - 1:
+        current_image_index += 1
+        viewer.layers.clear()
+        load_image(viewer, image_paths[current_image_index])
         update_instructions(1)
-    elif len(shapes_layer.data) == 2:
-        update_instructions(3)
+        image_index.setText(str(current_image_index + 1))
+    else:
+        show_info("Toutes les images ont été traitées.")
 
+# Fonction pour charger l'image précédente
+def previous_image(viewer):
+    """
+    Charge l'image précédente.
+    :param viewer:
+    :return:
+    """
+    global current_image_index, image_paths
+    if current_image_index > 0:
+        current_image_index -= 1
+        viewer.layers.clear()
+        load_image(viewer, image_paths[current_image_index])
+        update_instructions(1)
+        image_index.setText(str(current_image_index + 1))
+    else:
+        show_info("Vous êtes déjà à la première image.")
 
 # Fonction pour créer un widget combiné
 def create_combined_widget(viewer):
     """
-    The widget buttons.
+    Crée un widget combiné pour l'interface utilisateur
     :param viewer:
     :return:
     """
@@ -265,7 +277,7 @@ def create_combined_widget(viewer):
     layout.addWidget(select_folder_button)
 
     valider_button = QPushButton("Calcul des coordonnées")
-    valider_button.clicked.connect(lambda: valider_segments(viewer))
+    valider_button.clicked.connect(lambda: valider_points(viewer))
     layout.addWidget(valider_button)
 
     navigation_layout = QHBoxLayout()
@@ -289,6 +301,10 @@ def create_combined_widget(viewer):
     show_axes_checkbox = QCheckBox("Afficher les axes")
     layout.addWidget(show_axes_checkbox)
 
+    global show_cone_checkbox
+    show_cone_checkbox = QCheckBox("Afficher le cône")
+    layout.addWidget(show_cone_checkbox)
+
     instructions_frame = QFrame()
     instructions_frame.setFrameShape(QFrame.Box)
     instructions_frame.setFrameShadow(QFrame.Raised)
@@ -309,7 +325,6 @@ def create_combined_widget(viewer):
     update_instructions(1)
 
     return combined_widget
-
 
 # Variables globales pour les chemins d'image et l'index actuel
 image_paths = []
