@@ -12,98 +12,74 @@ from napari.utils.notifications import show_info
 
 # Fonction de calcul pour ajuster un plan aux moindres carrés contraint
 def ajustement_moindres_carres_contraint(sommet, points):
-    """
-    Ajuste un plan aux moindres carrés à un ensemble de points,
-    en imposant que le plan passe par le sommet donné.
-
-    Args:
-    - sommet (np.array): Coordonnées du sommet du cône (doit être un point par lequel le plan passe).
-    - points (np.array): Coordonnées des points pour l'ajustement.
-
-    Returns:
-    - normal (np.array): Vecteur normal au plan.
-    """
-    # Convertir les points en coordonnées relatives par rapport au sommet
     points_centres = points - sommet
-
-    # Calcul de la matrice de covariance des points centrés
     covariance_matrix = np.cov(points_centres, rowvar=False)
-
-    # Les vecteurs propres de la matrice de covariance donnent la direction du plus grand écart
     eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-
-    # La direction du vecteur propre correspondant à la plus petite valeur propre est la normale du plan
-    normal = eigenvectors[:, 0]  # Vecteur propre associé à la plus petite valeur propre
-
+    normal = eigenvectors[:, 0]
     return normal
 
 
 # Fonction de calcul pour le repère à partir des points
 def calcul_repere(points):
-    """
-    Calcule les coordonnées des vecteurs et de l'origine du
-    nouveau repère basé sur le cône de révolution
-
-    Args:
-    points (array): coordonnées des points :
-    array([
-        [z1,y1,x1], # Sommet du cône
-        [z2,y2,x2], # Point pour le plan
-        [z3,y3,x3], # Point pour le plan
-        [z4,y4,x4], # Point pour le plan
-        [z5,y5,x5], # Point pour le plan
-        [z6,y6,x6], # Point sur la base
-    ])
-
-    Returns:
-    - origine (tuple): Coordonnées de l'origine du nouveau repère (centre de la base).
-    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
-    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
-    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
-    - points_plan (np.array): Coordonnées des points définissant le plan.
-    """
     sommet = points[0]
     points_plan = points[1:5]
     point_base = points[5]
-
-    # Calcul du vecteur normal au plan défini par les points 2, 3, 4, 5
     vecteur_v = ajustement_moindres_carres_contraint(sommet, points_plan)
     vecteur_v = vecteur_v / np.linalg.norm(vecteur_v)
-
-    # Calcul du point symétrique de point_base par rapport au plan
     distance_au_plan = np.dot(point_base - sommet, vecteur_v)
     point_sym = point_base - 2 * distance_au_plan * vecteur_v
-
-    # Calcul du centre de la base (milieu entre point_base et point_sym)
     centre_base = (point_base + point_sym) / 2
 
-    # Calcul du vecteur unitaire y (axe de la hauteur, du centre de la base au sommet)
     vecteur_y = sommet - centre_base
     vecteur_y = vecteur_y / np.linalg.norm(vecteur_y)
-
-    # Calcul du vecteur unitaire u (dans le plan de la base, direction de la base)
     vecteur_u = point_base - centre_base
     vecteur_u = vecteur_u / np.linalg.norm(vecteur_u)
-
-    # Calcul du vecteur unitaire w (perpendiculaire aux deux autres)
     vecteur_w = np.cross(vecteur_u, vecteur_y)
     vecteur_w = vecteur_w / np.linalg.norm(vecteur_w)
 
     return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v
 
 
+# Ajuster l'origine pour une hauteur de cône donnée
+def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz):
+    hauteur_pixels = hauteur_physique / np.linalg.norm([dz, dy, dx])
+    vecteur_y_pixels = vecteur_y * hauteur_pixels / np.linalg.norm(vecteur_y)
+
+    nouvelle_origine = sommet - vecteur_y_pixels
+    return nouvelle_origine
+
+
+# Fonction pour valider les points et calculer le repère
+@magicgui(call_button="Calcul des coordonnées")
+def valider_points(viewer: napari.Viewer):
+    points_layer = viewer.layers['Points']
+    points = points_layer.data
+    if len(points) != 6:
+        show_info("Vous devez placer six points.")
+    else:
+        centre_base, u, v, w, sommet, vecteur_v = calcul_repere(points)
+        dx = float(dx_input.text())
+        dy = float(dy_input.text())
+        dz = float(dz_input.text())
+        hauteur_physique = float(hauteur_input.text())
+
+        nouvelle_origine = ajuster_origine(centre_base, sommet, v, hauteur_physique, dx, dy, dz)
+        save_data_to_csv(image_paths[current_image_index], (nouvelle_origine, u, v, w))
+        update_instructions(6)
+        if show_plane_checkbox.isChecked():
+            draw_plane(viewer, sommet, vecteur_v)
+        if show_cone_checkbox.isChecked():
+            draw_cone(viewer, sommet, nouvelle_origine, points[5], u, w)
+        if show_axes_checkbox.isChecked():
+            draw_axes(viewer, nouvelle_origine, u, v, w)
+            draw_origin(viewer, nouvelle_origine)
+        else:
+            next_image(viewer)
+
+
 # Fonction pour dessiner le plan
 def draw_plane(viewer, sommet, vecteur_v):
-    """
-    Dessine un plan en utilisant un quadrilatère approximant le plan calculé.
-
-    Args:
-    - sommet (np.array): Coordonnées du sommet du cône.
-    - vecteur_v (np.array): Vecteur normal au plan.
-    """
-    # Définir un grand quadrilatère autour du sommet pour représenter le plan
-    scale_factor = 200  # Ajuster en fonction de l'échelle de vos données
-    # Trouver deux vecteurs dans le plan
+    scale_factor = 100
     arbitrary_vector = np.array([1, 0, 0])
     if np.allclose(np.cross(arbitrary_vector, vecteur_v), 0):
         arbitrary_vector = np.array([0, 1, 0])
@@ -113,45 +89,33 @@ def draw_plane(viewer, sommet, vecteur_v):
     in_plane_vector2 = np.cross(vecteur_v, in_plane_vector1)
     in_plane_vector2 = scale_factor * in_plane_vector2 / np.linalg.norm(in_plane_vector2)
 
-    # Calcul des coins du quadrilatère
     p1 = sommet + in_plane_vector1 + in_plane_vector2
     p2 = sommet + in_plane_vector1 - in_plane_vector2
     p3 = sommet - in_plane_vector1 - in_plane_vector2
     p4 = sommet - in_plane_vector1 + in_plane_vector2
 
-    # Ajouter le quadrilatère au calque de formes
-    viewer.add_shapes(data=[np.array([p1, p2, p3, p4])], shape_type='polygon', edge_width=1, edge_color='cyan',
-                      face_color='cyan', opacity=0.3, name='Plan')
+    viewer.add_shapes(data=[np.array([p1, p2, p3, p4])],
+                      shape_type='polygon',
+                      edge_width=1,
+                      edge_color='cyan',
+                      face_color='cyan',
+                      opacity=0.3,
+                      name='Plan')
 
 
 # Fonction pour dessiner le cône de révolution
 def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
-    """
-    Dessine une représentation approximative du cône de révolution.
-
-    Args:
-    - sommet (array): Coordonnées du sommet du cône.
-    - centre_base (array): Coordonnées du centre de la base du cône.
-    - point_base (array): Coordonnées d'un point sur la base.
-    - vecteur_u (array): Vecteur directeur de la base.
-    - vecteur_w (array): Vecteur perpendiculaire pour former le plan de la base.
-    """
-    # Calcul du rayon de la base à partir du point_base
     rayon_base = np.linalg.norm(point_base - centre_base)
+    num_segments = 12
+    angles = np.linspace(0, 2 * np.pi, num_segments, endpoint=False)
 
-    # Paramètres pour le dessin du cercle de la base
-    angles = np.linspace(0, 2 * np.pi, 12)  # 36 points pour approximer le cercle
-
-    # Points de la base
     base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in
                    angles]
     base_points = np.array(base_points)
 
-    # Ajouter le cercle de la base
-    viewer.add_shapes(data=base_points, shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow',
+    viewer.add_shapes(data=[base_points], shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow',
                       opacity=0.3, name='Base du cône')
 
-    # Ajouter les lignes reliant le sommet à la base
     for point in base_points:
         viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow',
                           name='Arête du cône')
@@ -159,11 +123,6 @@ def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
 
 # Fonction pour mettre à jour les instructions
 def update_instructions(num_points):
-    """
-    Met à jour les instructions en fonction du nombre de points placés
-    :param num_points:
-    :return:
-    """
     if num_points == 0:
         instructions_text.setText("Placez le sommet du cône.")
     elif num_points == 1:
@@ -184,63 +143,19 @@ def update_instructions(num_points):
 
 # Fonction pour suivre les changements dans le calque de points
 def on_points_update(event):
-    """
-    Met à jour les instructions en fonction du nombre de points placés.
-    :param event:
-    :return:
-    """
     points_layer = event.source
     num_points = len(points_layer.data)
     update_instructions(num_points)
 
 
-# Fonction pour valider les points et calculer le repère
-@magicgui(call_button="Calcul des coordonnées")
-def valider_points(viewer: napari.Viewer):
-    """
-    Valide les points placés et calcule le nouveau repère
-    :param viewer:
-    :return:
-    """
-    points_layer = viewer.layers['Points']
-    points = points_layer.data
-    if len(points) != 6:
-        show_info("Vous devez placer six points.")
-    else:
-        origine, u, v, w, sommet, vecteur_v = calcul_repere(points)
-        save_data_to_csv(image_paths[current_image_index], (origine, u, v, w))
-        update_instructions(6)
-        if show_plane_checkbox.isChecked():
-            draw_plane(viewer, sommet, vecteur_v)
-        if show_cone_checkbox.isChecked():
-            draw_cone(viewer, points[0], origine, points[5], u, w)
-        if show_axes_checkbox.isChecked():
-            draw_axes(viewer, origine, u, v, w)
-            draw_origin(viewer, origine)
-        else:
-            next_image(viewer)
-
-
 # Fonction pour dessiner le repère
 def draw_axes(viewer, origine, u, v, w):
-    """
-    Dessine les 3 axes d'un repère
-
-    Args:
-    - Origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
-    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
-    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
-    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
-    """
-    # Dessine l'axe x
     segment_u = np.array([origine, origine + 50 * u])
     viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue', name='Axe X')
 
-    # Dessine l'axe y
     segment_v = np.array([origine, origine + 50 * v])
     viewer.add_shapes(segment_v, shape_type='line', edge_width=1, edge_color='red', name='Axe Y')
 
-    # Dessine l'axe z
     segment_w = np.array([origine, origine + 50 * w])
     viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green', name='Axe Z')
 
@@ -249,24 +164,11 @@ def draw_axes(viewer, origine, u, v, w):
 
 # Fonction pour dessiner l'origine du repère
 def draw_origin(viewer, origine):
-    """
-    Dessine un point rouge à l'origine du repère.
-
-    Args:
-    - origine (tuple): Coordonnées de l'origine du repère (centre de la base du cône).
-    """
     viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
 
 
 # Fonction pour sauvegarder les données dans un fichier CSV
 def save_data_to_csv(image_path, data):
-    """
-    Sauvegarde les données calculées dans un fichier CSV
-
-    Args:
-    - image_path (str): Chemin de l'image en cours de traitement.
-    - data (tuple): Données contenant l'origine et les vecteurs u, v, w.
-    """
     csv_filename = os.path.splitext(image_path)[0] + '.csv'
     with open(csv_filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
@@ -276,27 +178,16 @@ def save_data_to_csv(image_path, data):
 
 # Fonction pour charger une image et créer un layer de points
 def load_image(viewer, image_path):
-    """
-    Charge une image et ajoute un calque de points pour la saisie des points.
-    :param viewer:
-    :param image_path:
-    :return:
-    """
     image = imread(image_path)
     viewer.add_image(image, name='Image 3D')
     points_layer = viewer.add_points(ndim=3, name='Points')
     points_layer.mode = 'add'
-    points_layer.events.data.connect(on_points_update)  # Connecte l'événement de mise à jour
+    points_layer.events.data.connect(on_points_update)
     viewer.dims.ndisplay = 2
 
 
 # Fonction pour sélectionner un dossier et charger la première image
 def select_folder_and_load_image(viewer):
-    """
-    Ouvre une boîte de dialogue pour sélectionner un dossier contenant les images à traiter.
-    :param viewer:
-    :return:
-    """
     global image_paths, current_image_index
     folder = QFileDialog.getExistingDirectory(None, "Sélectionner Dossier")
     if folder:
@@ -314,11 +205,6 @@ def select_folder_and_load_image(viewer):
 
 # Fonction pour charger l'image suivante
 def next_image(viewer):
-    """
-    Charge l'image suivante.
-    :param viewer:
-    :return:
-    """
     global current_image_index, image_paths
     if current_image_index < len(image_paths) - 1:
         current_image_index += 1
@@ -332,11 +218,6 @@ def next_image(viewer):
 
 # Fonction pour charger l'image précédente
 def previous_image(viewer):
-    """
-    Charge l'image précédente.
-    :param viewer:
-    :return:
-    """
     global current_image_index, image_paths
     if current_image_index > 0:
         current_image_index -= 1
@@ -348,19 +229,35 @@ def previous_image(viewer):
         show_info("Vous êtes déjà à la première image.")
 
 
+# Création des champs de saisie pour la résolution
+dx_input = QLineEdit()
+dx_input.setPlaceholderText("dx (µm/pixel)")
+dy_input = QLineEdit()
+dy_input.setPlaceholderText("dy (µm/pixel)")
+dz_input = QLineEdit()
+dz_input.setPlaceholderText("dz (µm/pixel)")
+hauteur_input = QLineEdit()
+hauteur_input.setPlaceholderText("Hauteur physique (µm)")
+
+
 # Fonction pour créer un widget combiné
 def create_combined_widget(viewer):
-    """
-    Crée un widget combiné pour l'interface utilisateur
-    :param viewer:
-    :return:
-    """
     combined_widget = QWidget()
     layout = QVBoxLayout()
 
     select_folder_button = QPushButton("Sélectionner Dossier")
     select_folder_button.clicked.connect(lambda: select_folder_and_load_image(viewer))
     layout.addWidget(select_folder_button)
+
+    layout.addWidget(QLabel("Résolution:"))
+    layout.addWidget(QLabel("dx:"))
+    layout.addWidget(dx_input)
+    layout.addWidget(QLabel("dy:"))
+    layout.addWidget(dy_input)
+    layout.addWidget(QLabel("dz:"))
+    layout.addWidget(dz_input)
+    layout.addWidget(QLabel("Hauteur du cône:"))
+    layout.addWidget(hauteur_input)
 
     valider_button = QPushButton("Calcul des coordonnées")
     valider_button.clicked.connect(lambda: valider_points(viewer))
