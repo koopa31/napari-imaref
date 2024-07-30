@@ -125,7 +125,10 @@ def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz
     - nouvelle_origine (array): Coordonnées ajustées de l'origine du cône.
     """
     # Calculer la hauteur en pixels en fonction de la résolution et de la hauteur physique
-    hauteur_pixels = hauteur_physique / np.linalg.norm([dz, dy, dx])
+    # Calculer les contributions des résolutions
+    facteur = np.sqrt((vecteur_y[0] * dx) ** 2 + (vecteur_y[1] * dy) ** 2 + (vecteur_y[2] * dz) ** 2)
+
+    hauteur_pixels = hauteur_physique / facteur
     vecteur_y_pixels = vecteur_y * hauteur_pixels / np.linalg.norm(vecteur_y)
 
     # Ajuster l'origine du cône pour correspondre à la nouvelle hauteur
