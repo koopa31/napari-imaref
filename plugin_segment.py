@@ -8,6 +8,33 @@ import os
 import csv
 from napari.utils.notifications import show_info
 
+# Fonction de calcul pour ajuster un plan aux moindres carrés contraint
+def ajustement_moindres_carres_contraint(sommet, points):
+    """
+    Ajuste un plan aux moindres carrés à un ensemble de points,
+    en imposant que le plan passe par le sommet donné.
+
+    Args:
+    - sommet (np.array): Coordonnées du sommet du cône (doit être un point par lequel le plan passe).
+    - points (np.array): Coordonnées des points pour l'ajustement.
+
+    Returns:
+    - normal (np.array): Vecteur normal au plan.
+    """
+    # Convertir les points en coordonnées relatives par rapport au sommet
+    points_centres = points - sommet
+
+    # Calcul de la matrice de covariance des points centrés
+    covariance_matrix = np.cov(points_centres, rowvar=False)
+
+    # Les vecteurs propres de la matrice de covariance donnent la direction du plus grand écart
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+
+    # La direction du vecteur propre correspondant à la plus petite valeur propre est la normale du plan
+    normal = eigenvectors[:, 0]  # Vecteur propre associé à la plus petite valeur propre
+
+    return normal
+
 # Fonction de calcul pour le repère à partir des points
 def calcul_repere(points):
     """
@@ -20,7 +47,9 @@ def calcul_repere(points):
         [z1,y1,x1], # Sommet du cône
         [z2,y2,x2], # Point pour le plan
         [z3,y3,x3], # Point pour le plan
-        [z4,y4,x4], # Point sur la base
+        [z4,y4,x4], # Point pour le plan
+        [z5,y5,x5], # Point pour le plan
+        [z6,y6,x6], # Point sur la base
     ])
 
     Returns:
@@ -30,16 +59,15 @@ def calcul_repere(points):
     - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
     """
     sommet = points[0]
-    point_plan_1 = points[1]
-    point_plan_2 = points[2]
-    point_base = points[3]
+    points_plan = points[1:5]
+    point_base = points[5]
 
-    # Calcul du vecteur normal au plan défini par les points 2 et 3
-    vecteur_v = np.cross(point_plan_2 - point_plan_1, sommet - point_plan_1)
+    # Calcul du vecteur normal au plan défini par les points 2, 3, 4, 5
+    vecteur_v = ajustement_moindres_carres_contraint(sommet, points_plan)
     vecteur_v = vecteur_v / np.linalg.norm(vecteur_v)
 
     # Calcul du point symétrique de point_base par rapport au plan
-    distance_au_plan = np.dot(point_base - point_plan_1, vecteur_v)
+    distance_au_plan = np.dot(point_base - sommet, vecteur_v)
     point_sym = point_base - 2 * distance_au_plan * vecteur_v
 
     # Calcul du centre de la base (milieu entre point_base et point_sym)
@@ -89,21 +117,25 @@ def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
         viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow', name='Arête du cône')
 
 # Fonction pour mettre à jour les instructions
-def update_instructions(step):
+def update_instructions(num_points):
     """
-    Met à jour les instructions en fonction de l'étape actuelle
-    :param step:
+    Met à jour les instructions en fonction du nombre de points placés
+    :param num_points:
     :return:
     """
-    if step == 1:
+    if num_points == 0:
         instructions_text.setText("Placez le sommet du cône.")
-    elif step == 2:
+    elif num_points == 1:
         instructions_text.setText("Placez le premier point pour définir le plan.")
-    elif step == 3:
+    elif num_points == 2:
         instructions_text.setText("Placez le deuxième point pour définir le plan.")
-    elif step == 4:
+    elif num_points == 3:
+        instructions_text.setText("Placez le troisième point pour définir le plan.")
+    elif num_points == 4:
+        instructions_text.setText("Placez le quatrième point pour définir le plan.")
+    elif num_points == 5:
         instructions_text.setText("Placez un point sur le périmètre de la base.")
-    elif step == 5:
+    elif num_points == 6:
         instructions_text.setText("Cliquez sur 'Calcul des coordonnées' pour lancer les calculs.")
     else:
         instructions_text.setText("Instructions complètes.")
@@ -117,7 +149,7 @@ def on_points_update(event):
     """
     points_layer = event.source
     num_points = len(points_layer.data)
-    update_instructions(num_points + 1)
+    update_instructions(num_points)
 
 # Fonction pour valider les points et calculer le repère
 @magicgui(call_button="Calcul des coordonnées")
@@ -129,14 +161,14 @@ def valider_points(viewer: napari.Viewer):
     """
     points_layer = viewer.layers['Points']
     points = points_layer.data
-    if len(points) != 4:
-        show_info("Vous devez placer quatre points.")
+    if len(points) != 6:
+        show_info("Vous devez placer six points.")
     else:
         origine, u, v, w = calcul_repere(points)
         save_data_to_csv(image_paths[current_image_index], (origine, u, v, w))
         update_instructions(6)
         if show_cone_checkbox.isChecked():
-            draw_cone(viewer, points[0], origine, points[3], u, w)
+            draw_cone(viewer, points[0], origine, points[5], u, w)
         if show_axes_checkbox.isChecked():
             draw_axes(viewer, origine, u, v, w)
             draw_origin(viewer, origine)
@@ -223,7 +255,7 @@ def select_folder_and_load_image(viewer):
         if image_paths:
             viewer.layers.clear()
             load_image(viewer, image_paths[current_image_index])
-            update_instructions(1)
+            update_instructions(0)
             image_index.setText(str(current_image_index + 1))
         else:
             show_info("Aucune image trouvée dans le dossier.")
@@ -240,7 +272,7 @@ def next_image(viewer):
         current_image_index += 1
         viewer.layers.clear()
         load_image(viewer, image_paths[current_image_index])
-        update_instructions(1)
+        update_instructions(0)
         image_index.setText(str(current_image_index + 1))
     else:
         show_info("Toutes les images ont été traitées.")
@@ -257,7 +289,7 @@ def previous_image(viewer):
         current_image_index -= 1
         viewer.layers.clear()
         load_image(viewer, image_paths[current_image_index])
-        update_instructions(1)
+        update_instructions(0)
         image_index.setText(str(current_image_index + 1))
     else:
         show_info("Vous êtes déjà à la première image.")
@@ -322,7 +354,7 @@ def create_combined_widget(viewer):
     layout.addWidget(instructions_frame)
 
     combined_widget.setLayout(layout)
-    update_instructions(1)
+    update_instructions(0)
 
     return combined_widget
 
