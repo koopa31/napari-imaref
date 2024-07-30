@@ -1,12 +1,14 @@
 import napari
 from magicgui import magicgui
-from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, QLineEdit
+from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, \
+    QLineEdit
 from qtpy.QtCore import Qt
 import numpy as np
 from skimage.io import imread
 import os
 import csv
 from napari.utils.notifications import show_info
+
 
 # Fonction de calcul pour ajuster un plan aux moindres carrés contraint
 def ajustement_moindres_carres_contraint(sommet, points):
@@ -34,6 +36,7 @@ def ajustement_moindres_carres_contraint(sommet, points):
     normal = eigenvectors[:, 0]  # Vecteur propre associé à la plus petite valeur propre
 
     return normal
+
 
 # Fonction de calcul pour le repère à partir des points
 def calcul_repere(points):
@@ -87,6 +90,7 @@ def calcul_repere(points):
 
     return centre_base, vecteur_u, vecteur_y, vecteur_w
 
+
 # Fonction pour dessiner le cône de révolution
 def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
     """
@@ -106,15 +110,19 @@ def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
     angles = np.linspace(0, 2 * np.pi, 36)  # 36 points pour approximer le cercle
 
     # Points de la base
-    base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in angles]
+    base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in
+                   angles]
     base_points = np.array(base_points)
 
     # Ajouter le cercle de la base
-    viewer.add_shapes(data=base_points, shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow', opacity=0.3, name='Base du cône')
+    viewer.add_shapes(data=base_points, shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow',
+                      opacity=0.3, name='Base du cône')
 
     # Ajouter les lignes reliant le sommet à la base
     for point in base_points:
-        viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow', name='Arête du cône')
+        viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow',
+                          name='Arête du cône')
+
 
 # Fonction pour mettre à jour les instructions
 def update_instructions(num_points):
@@ -140,6 +148,7 @@ def update_instructions(num_points):
     else:
         instructions_text.setText("Instructions complètes.")
 
+
 # Fonction pour suivre les changements dans le calque de points
 def on_points_update(event):
     """
@@ -150,6 +159,7 @@ def on_points_update(event):
     points_layer = event.source
     num_points = len(points_layer.data)
     update_instructions(num_points)
+
 
 # Fonction pour valider les points et calculer le repère
 @magicgui(call_button="Calcul des coordonnées")
@@ -174,6 +184,7 @@ def valider_points(viewer: napari.Viewer):
             draw_origin(viewer, origine)
         else:
             next_image(viewer)
+
 
 # Fonction pour dessiner le repère
 def draw_axes(viewer, origine, u, v, w):
@@ -200,6 +211,7 @@ def draw_axes(viewer, origine, u, v, w):
 
     viewer.dims.ndisplay = 3
 
+
 # Fonction pour dessiner l'origine du repère
 def draw_origin(viewer, origine):
     """
@@ -209,6 +221,7 @@ def draw_origin(viewer, origine):
     - origine (tuple): Coordonnées de l'origine du repère (centre de la base du cône).
     """
     viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
+
 
 # Fonction pour sauvegarder les données dans un fichier CSV
 def save_data_to_csv(image_path, data):
@@ -225,6 +238,7 @@ def save_data_to_csv(image_path, data):
         csv_writer.writerow(['Origine', 'u', 'v', 'w'])
         csv_writer.writerow(data)
 
+
 # Fonction pour charger une image et créer un layer de points
 def load_image(viewer, image_path):
     """
@@ -240,6 +254,7 @@ def load_image(viewer, image_path):
     points_layer.events.data.connect(on_points_update)  # Connecte l'événement de mise à jour
     viewer.dims.ndisplay = 2
 
+
 # Fonction pour sélectionner un dossier et charger la première image
 def select_folder_and_load_image(viewer):
     """
@@ -250,7 +265,8 @@ def select_folder_and_load_image(viewer):
     global image_paths, current_image_index
     folder = QFileDialog.getExistingDirectory(None, "Sélectionner Dossier")
     if folder:
-        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if
+                       f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
         current_image_index = 0
         if image_paths:
             viewer.layers.clear()
@@ -259,6 +275,7 @@ def select_folder_and_load_image(viewer):
             image_index.setText(str(current_image_index + 1))
         else:
             show_info("Aucune image trouvée dans le dossier.")
+
 
 # Fonction pour charger l'image suivante
 def next_image(viewer):
@@ -277,6 +294,7 @@ def next_image(viewer):
     else:
         show_info("Toutes les images ont été traitées.")
 
+
 # Fonction pour charger l'image précédente
 def previous_image(viewer):
     """
@@ -293,6 +311,7 @@ def previous_image(viewer):
         image_index.setText(str(current_image_index + 1))
     else:
         show_info("Vous êtes déjà à la première image.")
+
 
 # Fonction pour créer un widget combiné
 def create_combined_widget(viewer):
@@ -357,6 +376,7 @@ def create_combined_widget(viewer):
     update_instructions(0)
 
     return combined_widget
+
 
 # Variables globales pour les chemins d'image et l'index actuel
 image_paths = []
