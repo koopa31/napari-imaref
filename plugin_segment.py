@@ -90,6 +90,24 @@ def calcul_repere(points):
 
     return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v
 
+# Fonction pour redefinir l'origine en fonction de la resolution et d'une distance prédéfinie
+def calcul_origine(sommet, vecteur_v, resolution, distance =75):
+    """
+    Calcule une origine l'origine en fonction de la resolution et d'une distance prédéfinie
+
+    Args:
+    - sommet (array): Coordonnées du sommet du cône.
+    - vecteur_v (array): Vecteur directeur de la base NORMALISE
+    - resolution (array): array contenant la resolution de l'image (en µm/pixel)
+    - distance (float): distance en µm entre le sommet et l'origine (par default 75µm)
+    """
+    vecteur_resolu = np.dot(vecteur_v,resolution)
+    vecteur_resolu = vecteur_resolu / np.linalg.norm(vecteur_resolu)
+    origine = sommet + vecteur_resolu*distance
+
+    return origine
+
+
 
 # Ajuster l'origine pour une hauteur de cône donnée
 def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz):
