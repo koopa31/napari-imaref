@@ -60,6 +60,7 @@ def calcul_repere(points):
     - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
     - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
     - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
+    - points_plan (np.array): Coordonnées des points définissant le plan.
     """
     sommet = points[0]
     points_plan = points[1:5]
@@ -88,7 +89,39 @@ def calcul_repere(points):
     vecteur_w = np.cross(vecteur_u, vecteur_y)
     vecteur_w = vecteur_w / np.linalg.norm(vecteur_w)
 
-    return centre_base, vecteur_u, vecteur_y, vecteur_w
+    return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v
+
+
+# Fonction pour dessiner le plan
+def draw_plane(viewer, sommet, vecteur_v):
+    """
+    Dessine un plan en utilisant un quadrilatère approximant le plan calculé.
+
+    Args:
+    - sommet (np.array): Coordonnées du sommet du cône.
+    - vecteur_v (np.array): Vecteur normal au plan.
+    """
+    # Définir un grand quadrilatère autour du sommet pour représenter le plan
+    scale_factor = 200  # Ajuster en fonction de l'échelle de vos données
+    # Trouver deux vecteurs dans le plan
+    arbitrary_vector = np.array([1, 0, 0])
+    if np.allclose(np.cross(arbitrary_vector, vecteur_v), 0):
+        arbitrary_vector = np.array([0, 1, 0])
+
+    in_plane_vector1 = np.cross(vecteur_v, arbitrary_vector)
+    in_plane_vector1 = scale_factor * in_plane_vector1 / np.linalg.norm(in_plane_vector1)
+    in_plane_vector2 = np.cross(vecteur_v, in_plane_vector1)
+    in_plane_vector2 = scale_factor * in_plane_vector2 / np.linalg.norm(in_plane_vector2)
+
+    # Calcul des coins du quadrilatère
+    p1 = sommet + in_plane_vector1 + in_plane_vector2
+    p2 = sommet + in_plane_vector1 - in_plane_vector2
+    p3 = sommet - in_plane_vector1 - in_plane_vector2
+    p4 = sommet - in_plane_vector1 + in_plane_vector2
+
+    # Ajouter le quadrilatère au calque de formes
+    viewer.add_shapes(data=[np.array([p1, p2, p3, p4])], shape_type='polygon', edge_width=1, edge_color='cyan',
+                      face_color='cyan', opacity=0.3, name='Plan')
 
 
 # Fonction pour dessiner le cône de révolution
@@ -107,7 +140,7 @@ def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
     rayon_base = np.linalg.norm(point_base - centre_base)
 
     # Paramètres pour le dessin du cercle de la base
-    angles = np.linspace(0, 2 * np.pi, 36)  # 36 points pour approximer le cercle
+    angles = np.linspace(0, 2 * np.pi, 12)  # 36 points pour approximer le cercle
 
     # Points de la base
     base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in
@@ -174,9 +207,11 @@ def valider_points(viewer: napari.Viewer):
     if len(points) != 6:
         show_info("Vous devez placer six points.")
     else:
-        origine, u, v, w = calcul_repere(points)
+        origine, u, v, w, sommet, vecteur_v = calcul_repere(points)
         save_data_to_csv(image_paths[current_image_index], (origine, u, v, w))
         update_instructions(6)
+        if show_plane_checkbox.isChecked():
+            draw_plane(viewer, sommet, vecteur_v)
         if show_cone_checkbox.isChecked():
             draw_cone(viewer, points[0], origine, points[5], u, w)
         if show_axes_checkbox.isChecked():
@@ -355,6 +390,10 @@ def create_combined_widget(viewer):
     global show_cone_checkbox
     show_cone_checkbox = QCheckBox("Afficher le cône")
     layout.addWidget(show_cone_checkbox)
+
+    global show_plane_checkbox
+    show_plane_checkbox = QCheckBox("Afficher le plan")
+    layout.addWidget(show_plane_checkbox)
 
     instructions_frame = QFrame()
     instructions_frame.setFrameShape(QFrame.Box)
