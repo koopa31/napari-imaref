@@ -467,12 +467,16 @@ def on_new_point_added(event, viewer):
 # Création des champs de saisie pour la résolution
 dx_input = QLineEdit()
 dx_input.setPlaceholderText("dx (um/pixel)")
+dx_input.setText("0.569")
 dy_input = QLineEdit()
 dy_input.setPlaceholderText("dy (um/pixel)")
+dy_input.setText("0.569")
 dz_input = QLineEdit()
 dz_input.setPlaceholderText("dz (um/pixel)")
+dz_input.setText("0.569")
 hauteur_input = QLineEdit()
 hauteur_input.setPlaceholderText("Hauteur physique (um)")
+hauteur_input.setText("75")
 
 
 # Fonction pour créer un widget combiné
