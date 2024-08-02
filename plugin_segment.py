@@ -181,6 +181,9 @@ def valider_points(viewer: napari.Viewer):
         dz = float(dz_input.text())
         hauteur_physique = float(hauteur_input.text())
 
+        draw_axes(viewer, centre_base, u, v, w)
+        draw_origin(viewer, centre_base)
+
         # Ajuster l'origine du repère en fonction de la hauteur physique
         nouvelle_origine = ajuster_origine(centre_base, sommet, v, hauteur_physique, dx, dy, dz)
         save_data_to_csv(image_paths[current_image_index], (nouvelle_origine, u, v, w))
@@ -473,7 +476,7 @@ dy_input.setPlaceholderText("dy (um/pixel)")
 dy_input.setText("0.569")
 dz_input = QLineEdit()
 dz_input.setPlaceholderText("dz (um/pixel)")
-dz_input.setText("0.569")
+dz_input.setText("0.5")
 hauteur_input = QLineEdit()
 hauteur_input.setPlaceholderText("Hauteur physique (um)")
 hauteur_input.setText("75")
