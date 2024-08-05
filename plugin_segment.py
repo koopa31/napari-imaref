@@ -4,6 +4,7 @@ from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButto
     QLineEdit
 from qtpy.QtCore import Qt
 import numpy as np
+from scipy.optimize import fsolve
 from skimage.io import imread
 import os
 import csv
@@ -133,7 +134,91 @@ def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz
 
     # Ajuster l'origine du cône pour correspondre à la nouvelle hauteur
     nouvelle_origine = sommet - vecteur_y_pixels
-    return nouvelle_origine
+    return nouvelle_origine, hauteur_pixels
+
+
+def projection_orthogonale_sur_plan(A, centre_base, v, w):
+    """
+    Projette orthogonalement un point A sur un plan défini par un point centre_base et les vecteurs v et w.
+
+    Args:
+    - A (np.array): Coordonnées du point à projeter.
+    - centre_base (np.array): Coordonnées d'un point appartenant au plan.
+    - v (np.array): Premier vecteur directeur du plan.
+    - w (np.array): Deuxième vecteur directeur du plan.
+
+    Returns:
+    - A_prime (np.array): Coordonnées du point projeté sur le plan.
+    """
+    # Calculer le vecteur normal au plan
+    n = np.cross(v, w)
+
+    # Calculer le vecteur AC
+    AC = A - centre_base
+
+    # Calculer la projection de AC sur le vecteur normal
+    projection_AC_sur_n = (np.dot(AC, n) / np.dot(n, n)) * n
+
+    # Calculer la projection orthogonale de A sur le plan
+    A_prime = A - projection_AC_sur_n
+
+    return A_prime
+
+def trouver_nouvelle_origine(S, P, vecteur_v, vecteur_w, d, z_mi_hauteur):
+    # Fonction à résoudre pour trouver alpha et beta
+    def equations(vars):
+        alpha, beta = vars
+        O_prime = P + alpha * vecteur_v + beta * vecteur_w
+        eq1 = np.linalg.norm(S - O_prime) - d  # Distance au sommet doit être d
+        eq2 = O_prime[0] - z_mi_hauteur  # z(O') doit être z_mi_hauteur
+        return [eq1, eq2]
+
+    # Résolution des équations
+    alpha_beta_initial_guess = [1, 1]  # On peut initialiser avec [0, 0]
+    alpha_opt, beta_opt = fsolve(equations, alpha_beta_initial_guess)
+
+    # Calculer la nouvelle origine
+    O_prime_opt = P + alpha_opt * vecteur_v + beta_opt * vecteur_w
+    return O_prime_opt, alpha_opt, beta_opt
+
+
+def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points, hauteur_physique, dx, dy, dz):
+    """
+    Ajuste l'origine et réoriente les vecteurs u, y, et z pour correspondre à la hauteur en z et la distance au sommet.
+
+    Args:
+    - centre_base (array): Coordonnées actuelles du centre de la base du cône.
+    - sommet (array): Coordonnées du sommet du cône.
+    - vecteur_y (array): Vecteur unitaire indiquant la direction de la hauteur du cône.
+    - vecteur_u (array): Vecteur directeur de l'axe u du repère.
+    - points (array): Coordonnées des points utilisés pour calculer le repère.
+    - dx, dy, dz (float): Résolutions en unités de longueur par pixel/voxel.
+
+    Returns:
+    - nouvelle_origine (array): Coordonnées ajustées de l'origine du cône.
+    - nouveau_vecteur_y (array): Nouveau vecteur y réorienté.
+    - nouveau_vecteur_z (array): Nouveau vecteur z réorienté.
+    """
+    # Projet des points 2 et 5 sur le plan défini par le sommet et vecteur_y
+    point_2_proj = projection_orthogonale_sur_plan(points[1], centre_base, vecteur_y, vecteur_w)
+    point_5_proj = projection_orthogonale_sur_plan(points[4], centre_base, vecteur_y, vecteur_w)
+    mi_hauteur = (point_2_proj + point_5_proj) / 2
+    mi_hauteur_z = int(mi_hauteur[0])
+
+    viewer.add_points(mi_hauteur, name="mi_hauteur")
+    viewer.add_points(point_2_proj, name="point_2_proj")
+    viewer.add_points(point_5_proj, name="point_5_proj")
+
+    # Trouver la nouvelle origine
+    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w, hauteur_physique,
+                                                             mi_hauteur_z)
+
+    # Ajuster les vecteurs
+    nouveau_vecteur_y = (sommet - nouvelle_origine) / np.linalg.norm(sommet - nouvelle_origine)
+    nouveau_vecteur_w = np.cross(vecteur_u, nouveau_vecteur_y)
+    nouveau_vecteur_w /= np.linalg.norm(nouveau_vecteur_w)
+
+    return nouvelle_origine, nouveau_vecteur_y, nouveau_vecteur_w
 
 
 # Fonction pour transformer les coordonnées d'un point
@@ -185,7 +270,12 @@ def valider_points(viewer: napari.Viewer):
         draw_origin(viewer, centre_base)
 
         # Ajuster l'origine du repère en fonction de la hauteur physique
-        nouvelle_origine = ajuster_origine(centre_base, sommet, v, hauteur_physique, dx, dy, dz)
+        nouvelle_origine, hauteur_pixels = ajuster_origine(centre_base, sommet, v, hauteur_physique, dx, dy, dz)
+        draw_axes(viewer, nouvelle_origine, u, v, w)
+        draw_origin(viewer, nouvelle_origine)
+
+        nouvelle_origine, v, w = ajuster_hauteur(nouvelle_origine, sommet, u, v, w, points, hauteur_pixels, dx, dy, dz)
+
         save_data_to_csv(image_paths[current_image_index], (nouvelle_origine, u, v, w))
         update_instructions(6)
         if show_plane_checkbox.isChecked():
@@ -208,7 +298,7 @@ def draw_plane(viewer, sommet, vecteur_v):
     - sommet (np.array): Coordonnées du sommet du cône.
     - vecteur_v (np.array): Vecteur normal au plan.
     """
-    scale_factor = 100  # Facteur d'échelle pour définir la taille du plan
+    scale_factor = 300  # Facteur d'échelle pour définir la taille du plan
     arbitrary_vector = np.array([1, 0, 0])
     if np.allclose(np.cross(arbitrary_vector, vecteur_v), 0):
         arbitrary_vector = np.array([0, 1, 0])
