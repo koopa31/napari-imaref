@@ -8,6 +8,7 @@ from scipy.optimize import fsolve
 from skimage.io import imread
 import os
 import csv
+import pandas as pd
 from napari.utils.notifications import show_info
 
 
@@ -479,6 +480,7 @@ def save_data_to_csv(image_path, data):
     - image_path (str): Chemin de l'image en cours de traitement.
     - data (tuple): Données contenant l'origine et les vecteurs u, v, w.
     """
+    global csv_filename
     csv_filename = os.path.splitext(image_path)[0] + '.csv'
     with open(csv_filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
@@ -590,6 +592,15 @@ def on_new_point_added(event, viewer):
     if len(points_layer.data) > 6:
         new_point = points_layer.data[-1]
         new_coords = transformer_coordonnees(new_point, nouvelle_origine, u, v, w)
+
+        # Lire le fichier CSV existant
+        df = pd.read_csv(csv_filename)
+
+        # Ajouter les nouvelles coordonnées
+        df['Coordonnées point de référence'] = [new_coords]
+
+        # Écrire à nouveau dans le fichier CSV
+        df.to_csv(csv_filename, index=False)
         print(f"Coordonnées dans le nouveau repère: {new_coords}")
 
 
