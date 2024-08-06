@@ -15,27 +15,24 @@ from napari.utils.notifications import show_info
 # Fonction de calcul pour ajuster un plan aux moindres carrés contraint
 def ajustement_moindres_carres_contraint(sommet, points):
     """
-    Ajuste un plan aux moindres carrés à un ensemble de points,
-    en imposant que le plan passe par le sommet donné.
+        Ajuste un plan aux moindres carrés à un ensemble de points,
+        en imposant que le plan passe par le sommet donné en utilisant SVD.
 
-    Args:
-    - sommet (np.array): Coordonnées du sommet du cône (doit être un point par lequel le plan passe).
-    - points (np.array): Coordonnées des points pour l'ajustement.
+        Args:
+        - sommet (np.array): Coordonnées du sommet du cône (doit être un point par lequel le plan passe).
+        - points (np.array): Coordonnées des points pour l'ajustement.
 
-    Returns:
-    - normal (np.array): Vecteur normal au plan.
+        Returns:
+        - normal (np.array): Vecteur normal au plan.
     """
-    # Convertir les points en coordonnées relatives par rapport au sommet
+    # Center the points by subtracting the summit
     points_centres = points - sommet
 
-    # Calcul de la matrice de covariance des points centrés
-    covariance_matrix = np.cov(points_centres, rowvar=False)
+    # Perform SVD
+    U, S, Vt = np.linalg.svd(points_centres)
 
-    # Les vecteurs propres de la matrice de covariance donnent la direction du plus grand écart
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-
-    # La direction du vecteur propre correspondant à la plus petite valeur propre est la normale du plan
-    normal = eigenvectors[:, 0]  # Vecteur propre associé à la plus petite valeur propre
+    # The normal to the plane is the last row of Vt (corresponding to the smallest singular value)
+    normal = Vt[-1]
 
     return normal
 
@@ -293,6 +290,8 @@ def valider_points(viewer: napari.Viewer):
         dy = float(dy_input.text())
         dz = float(dz_input.text())
         hauteur_physique = float(hauteur_input.text())
+
+        viewer.add_points(centre_base, name="centre base")
 
         """ 
         draw_axes(viewer, centre_base, u, v, w)
