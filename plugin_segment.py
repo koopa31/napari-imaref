@@ -572,6 +572,8 @@ def calculer_coordonnees(viewer: napari.Viewer):
     Args:
     - viewer: Instance du visualiseur Napari.
     """
+    # suppression du layer de plan
+    viewer.layers.remove("Plan")
     viewer.dims.ndisplay = 2
     show_info("Placez un point pour calculer ses coordonnées dans le nouveau repère.")
     points_layer = viewer.layers['Points']
