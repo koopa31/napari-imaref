@@ -89,8 +89,9 @@ def calcul_repere(points):
 
     return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v
 
+
 # Fonction pour redefinir l'origine en fonction de la resolution et d'une distance prédéfinie
-def calcul_origine(sommet, vecteur_v, resolution, distance =75):
+def calcul_origine(sommet, vecteur_v, resolution, distance=75):
     """
     Calcule une origine l'origine en fonction de la resolution et d'une distance prédéfinie
 
@@ -100,12 +101,11 @@ def calcul_origine(sommet, vecteur_v, resolution, distance =75):
     - resolution (array): array contenant la resolution de l'image (en µm/pixel)
     - distance (float): distance en µm entre le sommet et l'origine (par default 75µm)
     """
-    vecteur_resolu = np.dot(vecteur_v,resolution)
+    vecteur_resolu = np.dot(vecteur_v, resolution)
     vecteur_resolu = vecteur_resolu / np.linalg.norm(vecteur_resolu)
-    origine = sommet + vecteur_resolu*distance
+    origine = sommet + vecteur_resolu * distance
 
     return origine
-
 
 
 # Ajuster l'origine pour une hauteur de cône donnée
@@ -162,6 +162,7 @@ def projection_orthogonale_sur_plan(A, centre_base, v, w):
 
     return A_prime
 
+
 def trouver_nouvelle_origine(S, P, vecteur_v, vecteur_w, d, z_mi_hauteur):
     # Fonction à résoudre pour trouver alpha et beta
     def equations(vars):
@@ -210,7 +211,8 @@ def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points
     viewer.add_points(point_5_proj, name="point_5_proj")
 
     # Trouver la nouvelle origine
-    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w, hauteur_physique,
+    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w,
+                                                             hauteur_physique,
                                                              mi_hauteur_z)
 
     # Ajuster les vecteurs
