@@ -205,6 +205,8 @@ def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points
     mi_hauteur = (point_2_proj + point_5_proj) / 2
     mi_hauteur_z = int(mi_hauteur[0])
 
+    print("Mi hauteur en Z attendue :", mi_hauteur_z)
+
     viewer.add_points(mi_hauteur, name="mi_hauteur")
     viewer.add_points(point_2_proj, name="point_2_proj")
     viewer.add_points(point_5_proj, name="point_5_proj")
@@ -243,6 +245,31 @@ def transformer_coordonnees(point, origine, u, v, w):
     # Résoudre le système linéaire pour obtenir les coordonnées dans le nouveau repère
     new_coords = np.linalg.solve(transformation_matrix, translation)
     return new_coords
+
+
+def calculer_distance_physique(point_x, point_y, dx, dy, dz):
+    """
+    Calcule la distance physique entre deux points en 3D en tenant compte des résolutions des axes.
+
+    Args:
+    - point_x (array-like): Coordonnées (x, y, z) du premier point.
+    - point_y (array-like): Coordonnées (x, y, z) du deuxième point.
+    - dx (float): Résolution pour l'axe x (en unités de longueur par pixel).
+    - dy (float): Résolution pour l'axe y (en unités de longueur par pixel).
+    - dz (float): Résolution pour l'axe z (en unités de longueur par pixel).
+
+    Returns:
+    - distance_physique (float): Distance physique entre les deux points.
+    """
+    point_x = np.array(point_x)
+    point_y = np.array(point_y)
+    # Appliquer les résolutions respectives aux différences de coordonnées
+    differences = np.array([(point_y[0] - point_x[0]) * dx,
+                            (point_y[1] - point_x[1]) * dy,
+                            (point_y[2] - point_x[2]) * dz])
+    # Calculer la distance euclidienne avec les différences ajustées
+    distance_physique = np.linalg.norm(differences)
+    return distance_physique
 
 
 # Fonction pour valider les points et calculer le repère
@@ -291,6 +318,11 @@ def valider_points(viewer: napari.Viewer):
             draw_origin(viewer, nouvelle_origine)
         else:
             next_image(viewer)
+
+        print("Hauteur de l'origine en Z : ", nouvelle_origine[0])
+        print("Distance au sommet en µm : ", calculer_distance_physique(viewer.layers["Points"].data[0],
+                                                                        viewer.layers["Origine"].data[0],
+                                                                        dx, dy, dz))
 
 
 # Fonction pour dessiner le plan
