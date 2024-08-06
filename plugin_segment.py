@@ -266,13 +266,17 @@ def valider_points(viewer: napari.Viewer):
         dz = float(dz_input.text())
         hauteur_physique = float(hauteur_input.text())
 
+        """ 
         draw_axes(viewer, centre_base, u, v, w)
         draw_origin(viewer, centre_base)
+        """
 
         # Ajuster l'origine du repère en fonction de la hauteur physique
         nouvelle_origine, hauteur_pixels = ajuster_origine(centre_base, sommet, v, hauteur_physique, dx, dy, dz)
+        """
         draw_axes(viewer, nouvelle_origine, u, v, w)
         draw_origin(viewer, nouvelle_origine)
+        """
 
         nouvelle_origine, v, w = ajuster_hauteur(nouvelle_origine, sommet, u, v, w, points, hauteur_pixels, dx, dy, dz)
 
