@@ -91,6 +91,13 @@ def calcul_repere(points):
     vecteur_w = np.cross(vecteur_u, vecteur_y)
     vecteur_w = vecteur_w / np.linalg.norm(vecteur_w)
 
+    # Vérification et correction de l'orientation de w
+    direction_bas = point_bas - centre_base
+    if np.dot(vecteur_w, direction_bas) < 0:
+        vecteur_w = -vecteur_w
+        vecteur_u = np.cross(vecteur_y, vecteur_w)
+        vecteur_u = vecteur_u / np.linalg.norm(vecteur_u)
+
     return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v, point_haut, point_bas
 
 
