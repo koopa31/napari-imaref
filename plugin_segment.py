@@ -1,6 +1,7 @@
 import napari
 from magicgui import magicgui
-from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, QLineEdit
+from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget, QFileDialog, QPushButton, QFrame, QCheckBox, QHBoxLayout, \
+    QLineEdit
 from qtpy.QtCore import Qt
 import numpy as np
 from scipy.optimize import fsolve
@@ -9,6 +10,7 @@ import os
 import csv
 import pandas as pd
 from napari.utils.notifications import show_info
+
 
 # Fonction de calcul pour ajuster un plan aux moindres carrés contraint
 def ajustement_moindres_carres_contraint(sommet, points):
@@ -33,6 +35,7 @@ def ajustement_moindres_carres_contraint(sommet, points):
     normal = Vt[-1]
 
     return normal
+
 
 # Fonction de calcul pour le repère à partir des points
 def calcul_repere(points):
@@ -117,6 +120,7 @@ def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz
     nouvelle_origine = sommet - vecteur_y_pixels
     return nouvelle_origine, hauteur_pixels
 
+
 def projection_orthogonale_sur_plan(A, centre_base, v, w):
     """
     Projette orthogonalement un point A sur un plan défini par un point centre_base et les vecteurs v et w.
@@ -144,6 +148,7 @@ def projection_orthogonale_sur_plan(A, centre_base, v, w):
 
     return A_prime
 
+
 def trouver_nouvelle_origine(S, P, vecteur_v, vecteur_w, d, z_mi_hauteur):
     # Fonction à résoudre pour trouver alpha et beta
     def equations(vars):
@@ -160,6 +165,7 @@ def trouver_nouvelle_origine(S, P, vecteur_v, vecteur_w, d, z_mi_hauteur):
     # Calculer la nouvelle origine
     O_prime_opt = P + alpha_opt * vecteur_v + beta_opt * vecteur_w
     return O_prime_opt, alpha_opt, beta_opt
+
 
 def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points, hauteur_physique, dx, dy, dz):
     """
@@ -191,7 +197,8 @@ def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points
     viewer.add_points(point_bas_proj, name="point_bas_proj")
 
     # Trouver la nouvelle origine
-    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w, hauteur_physique, mi_hauteur_z)
+    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w,
+                                                             hauteur_physique, mi_hauteur_z)
 
     # Ajuster les vecteurs
     nouveau_vecteur_y = (sommet - nouvelle_origine) / np.linalg.norm(sommet - nouvelle_origine)
@@ -199,6 +206,7 @@ def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points
     nouveau_vecteur_w /= np.linalg.norm(nouveau_vecteur_w)
 
     return nouvelle_origine, nouveau_vecteur_y, nouveau_vecteur_w
+
 
 # Fonction pour transformer les coordonnées d'un point
 def transformer_coordonnees(point, origine, u, v, w):
@@ -223,6 +231,7 @@ def transformer_coordonnees(point, origine, u, v, w):
     new_coords = np.linalg.solve(transformation_matrix, translation)
     return new_coords
 
+
 def calculer_distance_physique(point_x, point_y, dx, dy, dz):
     """
     Calcule la distance physique entre deux points en 3D en tenant compte des résolutions des axes.
@@ -246,6 +255,7 @@ def calculer_distance_physique(point_x, point_y, dx, dy, dz):
     # Calculer la distance euclidienne avec les différences ajustées
     distance_physique = np.linalg.norm(differences)
     return distance_physique
+
 
 # Fonction pour valider les points et calculer le repère
 @magicgui(call_button="Calcul des coordonnées")
@@ -301,6 +311,7 @@ def valider_points(viewer: napari.Viewer):
                                                                         viewer.layers["Origine"].data[0],
                                                                         dx, dy, dz))
 
+
 # Fonction pour dessiner le plan
 def draw_plane(viewer, sommet, vecteur_v):
     """
@@ -335,6 +346,7 @@ def draw_plane(viewer, sommet, vecteur_v):
                       opacity=0.3,
                       name='Plan')
 
+
 # Fonction pour dessiner le cône de révolution
 def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
     """
@@ -368,6 +380,7 @@ def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
         viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow',
                           name='Arête du cône')
 
+
 # Fonction pour mettre à jour les instructions
 def update_instructions(num_points):
     """
@@ -397,6 +410,7 @@ def update_instructions(num_points):
     else:
         instructions_text.setText("Instructions complètes.")
 
+
 # Fonction pour suivre les changements dans le calque de points
 def on_points_update(event):
     """
@@ -408,6 +422,7 @@ def on_points_update(event):
     points_layer = event.source
     num_points = len(points_layer.data)
     update_instructions(num_points)
+
 
 # Fonction pour dessiner le repère
 def draw_axes(viewer, origine, u, v, w):
@@ -434,6 +449,7 @@ def draw_axes(viewer, origine, u, v, w):
 
     viewer.dims.ndisplay = 3
 
+
 # Fonction pour dessiner l'origine du repère
 def draw_origin(viewer, origine):
     """
@@ -443,6 +459,7 @@ def draw_origin(viewer, origine):
     - origine (tuple): Coordonnées de l'origine du repère (centre de la base du cône).
     """
     viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
+
 
 # Fonction pour sauvegarder les données dans un fichier CSV
 def save_data_to_csv(image_path, data):
@@ -460,6 +477,7 @@ def save_data_to_csv(image_path, data):
         csv_writer.writerow(['Origine', 'u', 'v', 'w'])
         csv_writer.writerow(data)
 
+
 # Fonction pour charger une image et créer un layer de points
 def load_image(viewer, image_path):
     """
@@ -474,6 +492,7 @@ def load_image(viewer, image_path):
     points_layer.mode = 'add'
     points_layer.events.data.connect(on_points_update)  # Connecte l'événement de mise à jour
     viewer.dims.ndisplay = 2
+
 
 # Fonction pour sélectionner un dossier et charger la première image
 def select_folder_and_load_image(viewer):
@@ -496,6 +515,7 @@ def select_folder_and_load_image(viewer):
         else:
             show_info("Aucune image trouvée dans le dossier.")
 
+
 # Fonction pour charger l'image suivante
 def next_image(viewer):
     """
@@ -512,6 +532,7 @@ def next_image(viewer):
         image_index.setText(str(current_image_index + 1))
     else:
         show_info("Toutes les images ont été traitées.")
+
 
 # Fonction pour charger l'image précédente
 def previous_image(viewer):
@@ -530,6 +551,7 @@ def previous_image(viewer):
     else:
         show_info("Vous êtes déjà à la première image.")
 
+
 # Fonction pour passer en mode 2D et ajouter un point pour calculer ses coordonnées
 @magicgui(call_button="Calculer les coordonnées dans le nouveau repère")
 def calculer_coordonnees(viewer: napari.Viewer):
@@ -547,6 +569,7 @@ def calculer_coordonnees(viewer: napari.Viewer):
     points_layer.mode = 'add'
     viewer.layers.selection.active = points_layer
     points_layer.events.data.connect(lambda event: on_new_point_added(event, viewer))
+
 
 # Fonction pour traiter l'ajout d'un nouveau point et calculer ses coordonnées
 def on_new_point_added(event, viewer):
@@ -572,6 +595,7 @@ def on_new_point_added(event, viewer):
         df.to_csv(csv_filename, index=False)
         print(f"Coordonnées dans le nouveau repère: {new_coords}")
 
+
 # Création des champs de saisie pour la résolution
 dx_input = QLineEdit()
 dx_input.setPlaceholderText("dx (um/pixel)")
@@ -585,6 +609,7 @@ dz_input.setText("0.5")
 hauteur_input = QLineEdit()
 hauteur_input.setPlaceholderText("Hauteur physique (um)")
 hauteur_input.setText("75")
+
 
 # Fonction pour créer un widget combiné
 def create_combined_widget(viewer):
@@ -667,6 +692,7 @@ def create_combined_widget(viewer):
     update_instructions(0)
 
     return combined_widget
+
 
 # Variables globales pour les chemins d'image et l'index actuel
 image_paths = []
