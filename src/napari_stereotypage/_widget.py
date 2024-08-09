@@ -186,7 +186,8 @@ class StereotypingWidget(QWidget):
                                                                          dx, dy, dz))
 
     def calculate_new_coordinates(self):
-        self.viewer.layers.remove("Plan")
+        if "Plan" in self.viewer.layers:
+            self.viewer.layers.remove("Plan")
         self.viewer.dims.ndisplay = 2
         show_info("Place a point to calculate its coordinates in the new frame.")
         points_layer = self.viewer.layers['Points']
