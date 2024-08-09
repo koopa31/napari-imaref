@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/koopa31/napari_stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari_stereotypage)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari_stereotypage)](https://napari-hub.org/plugins/napari_stereotypage)
 
-A simple plugin to use FooBar segmentation within napari
+Stereotyping zebrafish embryos by manually setting a reference frame.
 
 ----------------------------------
 
