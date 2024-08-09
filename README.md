@@ -31,6 +31,11 @@ You can install `napari_stereotypage` via [pip]:
 ![](https://github.com/koopa31/napari_stereotypage/blob/38300132d34479ebbad7dd66b234d32bcb4cefb4/Image/gif_readme.gif)
 
 
+## Documentation
+
+A [documentation] is available to understand how to effectively learn how to use the plugin. 
+
+
 ## Contributing
 
 Contributions are very welcome. Tests can be run with [tox], please ensure
@@ -55,6 +60,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Apache Software License 2.0]: http://www.apache.org/licenses/LICENSE-2.0
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
+[documentation]: https://stereotyping-doc.readthedocs.io/en/latest/
 
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
