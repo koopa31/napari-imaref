@@ -202,7 +202,7 @@ class StereotypingWidget(QWidget):
             new_coords = transformer_coordonnees(new_point, self.nouvelle_origine, self.u, self.v, self.w)
 
             df = pd.read_csv(csv_filename)
-            df['Reference Point Coordinates'] = [new_coords]
+            df[f"Point {len(points_layer.data) - 8} Coordinates"] = [new_coords]
             df.to_csv(csv_filename, index=False)
             print(f"Coordinates in the new frame: {new_coords}")
 
