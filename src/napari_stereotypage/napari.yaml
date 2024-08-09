@@ -1,32 +1,32 @@
-name: napari-stereotypage
+name: napari_stereotypage
 display_name: Napari Stereotyping
 visibility: public
 categories: ["Annotation", "Segmentation", "Acquisition"]
 contributions:
   commands:
-    - id: napari-stereotypage.get_reader
+    - id: napari_stereotypage.get_reader
       python_name: napari_stereotypage._reader:napari_get_reader
       title: Open data with Napari Stereotyping
-    - id: napari-stereotypage.write_multiple
+    - id: napari_stereotypage.write_multiple
       python_name: napari_stereotypage._writer:write_multiple
       title: Save multi-layer data with Napari Stereotyping
-    - id: napari-stereotypage.write_single_image
+    - id: napari_stereotypage.write_single_image
       python_name: napari_stereotypage._writer:write_single_image
       title: Save image data with Napari Stereotyping
-    - id: napari-stereotypage.make_stereotyping_widget
+    - id: napari_stereotypage.make_stereotyping_widget
       python_name: napari_stereotypage._widget:StereotypingWidget
       title: Stereotyping Widget
   readers:
-    - command: napari-stereotypage.get_reader
+    - command: napari_stereotypage.get_reader
       accepts_directories: false
       filename_patterns: ['*.npy']
   writers:
-    - command: napari-stereotypage.write_multiple
+    - command: napari_stereotypage.write_multiple
       layer_types: ['image*','labels*']
       filename_extensions: []
-    - command: napari-stereotypage.write_single_image
+    - command: napari_stereotypage.write_single_image
       layer_types: ['image']
       filename_extensions: ['.npy']
   widgets:
-    - command: napari-stereotypage.make_stereotyping_widget
+    - command: napari_stereotypage.make_stereotyping_widget
       display_name: Stereotyping Widget

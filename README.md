@@ -1,11 +1,11 @@
-# napari-stereotypage
+# napari_stereotypage
 
-[![License BSD-3](https://img.shields.io/pypi/l/napari-stereotypage.svg?color=green)](https://github.com/koopa31/napari-stereotypage/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-stereotypage.svg?color=green)](https://pypi.org/project/napari-stereotypage)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-stereotypage.svg?color=green)](https://python.org)
-[![tests](https://github.com/koopa31/napari-stereotypage/workflows/tests/badge.svg)](https://github.com/koopa31/napari-stereotypage/actions)
-[![codecov](https://codecov.io/gh/koopa31/napari-stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari-stereotypage)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-stereotypage)](https://napari-hub.org/plugins/napari-stereotypage)
+[![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari_stereotypage.svg?color=green)](https://python.org)
+[![tests](https://github.com/koopa31/napari_stereotypage/workflows/tests/badge.svg)](https://github.com/koopa31/napari_stereotypage/actions)
+[![codecov](https://codecov.io/gh/koopa31/napari_stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari_stereotypage)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari_stereotypage)](https://napari-hub.org/plugins/napari_stereotypage)
 
 A simple plugin to use FooBar segmentation within napari
 
@@ -23,9 +23,9 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-You can install `napari-stereotypage` via [pip]:
+You can install `napari_stereotypage` via [pip]:
 
-    pip install napari-stereotypage
+    pip install napari_stereotypage
 
 
 
@@ -38,7 +38,7 @@ the coverage at least stays the same before you submit a pull request.
 ## License
 
 Distributed under the terms of the [BSD-3] license,
-"napari-stereotypage" is free and open source software
+"napari_stereotypage" is free and open source software
 
 ## Issues
 
