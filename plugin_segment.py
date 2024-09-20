@@ -301,7 +301,7 @@ def valider_points(viewer: napari.Viewer):
 
         nouvelle_origine, v, w = ajuster_hauteur(nouvelle_origine, sommet, u, v, w, points, hauteur_pixels, dx, dy, dz)
 
-        save_data_to_csv(image_paths[current_image_index], (nouvelle_origine, u, v, w))
+        save_data_to_csv(image_paths[current_image_index-1], (nouvelle_origine, u, v, w))
         update_instructions(8)
         if show_plane_checkbox.isChecked():
             draw_plane(viewer, sommet, vecteur_v)
@@ -486,15 +486,49 @@ def save_data_to_csv(image_path, data):
 
 
 # Fonction pour charger une image et créer un layer de points
-def load_image(viewer, image_path):
+def load_image(viewer):
     """
-    Charge une image et ajoute un calque de points pour la saisie des points.
+    Charge les différentes images pour un même échantillon
+    Applique la couleur correspondante, un auto-contraste et blending(additive)
+    Ajoute un calque de points pour la saisie des points.
     :param viewer:
-    :param image_path:
     :return:
     """
-    image = imread(image_path)
-    viewer.add_image(image, name='Image 3D')
+    global current_image_index
+    Color_id_green = str(Color_id_green_input.text())
+    Color_id_blue = str(Color_id_blue_input.text())
+    Color_id_red = str(Color_id_red_input.text())
+    # Check the color of each images from the same sample
+    # Apply blending(addititve), auto-contrast and the appropriate color
+    for i in range(Color_number):
+        image = imread(image_paths[current_image_index])
+        if Color_id_red in image_paths[current_image_index]:
+            viewer.add_image(image, name='Image red')
+            viewer.layers['Image red'].blending = 'additive'
+            viewer.layers['Image red'].colormap='red'
+            viewer.dims.set_point(0, len(viewer.layers['Image red'].data)/2)
+            viewer.layers['Image red'].reset_contrast_limits()
+        elif Color_id_green in image_paths[current_image_index]:
+            viewer.add_image(image, name='Image green')
+            viewer.layers['Image green'].blending = 'additive'
+            viewer.layers['Image green'].colormap='green'
+            viewer.dims.set_point(0, len(viewer.layers['Image green'].data)/2)
+            viewer.layers['Image green'].reset_contrast_limits()
+        elif Color_id_blue in image_paths[current_image_index]:
+            viewer.add_image(image, name='Image blue')
+            viewer.layers['Image blue'].blending = 'additive'
+            viewer.layers['Image blue'].colormap='blue'
+            viewer.dims.set_point(0, len(viewer.layers['Image blue'].data)/2)
+            viewer.layers['Image blue'].reset_contrast_limits()
+        else:
+            image_name = 'Image_'+str(i)
+            viewer.add_image(image, name=image_name)
+            viewer.layers[image_name].blending = 'additive'
+            viewer.layers[image_name].colormap='gray'
+            viewer.dims.set_point(0, len(viewer.layers[image_name].data)/2)
+            viewer.layers[image_name].reset_contrast_limits()
+        current_image_index += 1
+
     points_layer = viewer.add_points(ndim=3, name='Points')
     points_layer.mode = 'add'
     points_layer.events.data.connect(on_points_update)  # Connecte l'événement de mise à jour
@@ -508,17 +542,35 @@ def select_folder_and_load_image(viewer):
     :param viewer:
     :return:
     """
-    global image_paths, current_image_index
+    global image_paths, current_image_index, Color_number
+    Sample_id = str(Sample_id_imput.text())
+    Color_number = int(Color_number_imput.text())
     folder = QFileDialog.getExistingDirectory(None, "Sélectionner Dossier")
     if folder:
-        image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if
+        image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if
                        f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+        
+        image_paths = []
+        while len(image_list)>0:
+            #check the substring identifying files from the same sample
+            image_test = image_list[0]
+            identifier = image_test.split(Sample_id)
+            identifier = Sample_id + identifier[1]
+            for file in image_list:
+                # reorder image list corresponding to sample files
+                if file.endswith(identifier):
+                    image_paths.append(file)
+                    image_list.remove(file)
+        
         current_image_index = 0
+        
+        
+        
         if image_paths:
             viewer.layers.clear()
-            load_image(viewer, image_paths[current_image_index])
+            load_image(viewer)
             update_instructions(0)
-            image_index.setText(str(current_image_index + 1))
+            image_index.setText(str(current_image_index//Color_number))
         else:
             show_info("Aucune image trouvée dans le dossier.")
 
@@ -532,11 +584,10 @@ def next_image(viewer):
     """
     global current_image_index, image_paths
     if current_image_index < len(image_paths) - 1:
-        current_image_index += 1
         viewer.layers.clear()
-        load_image(viewer, image_paths[current_image_index])
+        load_image(viewer)
         update_instructions(0)
-        image_index.setText(str(current_image_index + 1))
+        image_index.setText(str(current_image_index//Color_number))
     else:
         show_info("Toutes les images ont été traitées.")
 
@@ -549,12 +600,12 @@ def previous_image(viewer):
     :return:
     """
     global current_image_index, image_paths
-    if current_image_index > 0:
-        current_image_index -= 1
+    if current_image_index > Color_number:
+        current_image_index -= Color_number*2
         viewer.layers.clear()
-        load_image(viewer, image_paths[current_image_index])
+        load_image(viewer)
         update_instructions(0)
-        image_index.setText(str(current_image_index + 1))
+        image_index.setText(str(current_image_index//Color_number))
     else:
         show_info("Vous êtes déjà à la première image.")
 
@@ -616,6 +667,22 @@ dz_input.setText("0.5")
 hauteur_input = QLineEdit()
 hauteur_input.setPlaceholderText("Hauteur physique (um)")
 hauteur_input.setText("75")
+# Création des champs de saisie pour l'ouverture automatique des images
+Sample_id_imput = QLineEdit()
+Sample_id_imput.setPlaceholderText("Sample identifier")
+Sample_id_imput.setText("_s")
+Color_number_imput = QLineEdit()
+Color_number_imput.setPlaceholderText("Number of colors")
+Color_number_imput.setText("2")
+Color_id_blue_input = QLineEdit()
+Color_id_blue_input.setPlaceholderText("Identifier for blue color")
+Color_id_blue_input.setText("CSU-405 Em 440-460")
+Color_id_green_input = QLineEdit()
+Color_id_green_input.setPlaceholderText("Identifier for blue color")
+Color_id_green_input.setText("CSU-488 Em 510-540")
+Color_id_red_input = QLineEdit()
+Color_id_red_input.setPlaceholderText("Identifier for red color")
+Color_id_red_input.setText("CSU-561 Em 593LP")
 
 
 # Fonction pour créer un widget combiné
@@ -641,6 +708,18 @@ def create_combined_widget(viewer):
     layout.addWidget(dz_input)
     layout.addWidget(QLabel("Hauteur du cône:"))
     layout.addWidget(hauteur_input)
+
+    layout.addWidget(QLabel("Sélection des images:"))
+    layout.addWidget(QLabel("Identifiant des échantillons:"))
+    layout.addWidget(Sample_id_imput)
+    layout.addWidget(QLabel("Nombre de canaux:"))
+    layout.addWidget(Color_number_imput)
+    layout.addWidget(QLabel("Identifiant du canal bleu:"))
+    layout.addWidget(Color_id_blue_input)
+    layout.addWidget(QLabel("Identifiant du canal vert:"))
+    layout.addWidget(Color_id_green_input)
+    layout.addWidget(QLabel("Identifiant du canal rouge:"))
+    layout.addWidget(Color_id_red_input)
 
     valider_button = QPushButton("Calcul des coordonnées")
     valider_button.clicked.connect(lambda: valider_points(viewer))

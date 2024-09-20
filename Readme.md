@@ -1,25 +1,69 @@
-# Napari zebra fish embryo stereotyping plugin
+# napari_stereotypage
 
-Ce plugin pour Napari permet de sélectionner un dossier contenant des images d'embryon de zebrafish,
-de tracer des segments sur chaque image, de calculer l'origine et les vecteurs directeurs de la base orthonormée
-définie par ces segments et de sauvegarder les résultats dans des fichiers CSV.
+[![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari_stereotypage.svg?color=green)](https://python.org)
+[![tests](https://github.com/koopa31/napari_stereotypage/workflows/tests/badge.svg)](https://github.com/koopa31/napari_stereotypage/actions)
+[![codecov](https://codecov.io/gh/koopa31/napari_stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari_stereotypage)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari_stereotypage)](https://napari-hub.org/plugins/napari_stereotypage)
 
-## Fonctionnalités
+Stereotyping zebrafish embryos by manually setting a reference frame.
 
-- Sélectionner un dossier contenant des images.
-- Tracer des segments sur les images avec le mode de dessin de segments activé par défaut.
-- Sauvegarder les résultats des calculs dans des fichiers CSV portant le même nom que les images.
-- Afficher des instructions pour guider l'utilisateur tout au long du processus.
+----------------------------------
 
-## Prérequis
+This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
 
-- Python 3.7+
-- Napari
-- magicgui
-- qtpy
-- scikit-image
+<!--
+Don't miss the full getting started guide to set up your new package:
+https://github.com/napari/cookiecutter-napari-plugin#getting-started
 
-Vous pouvez installer les dépendances nécessaires avec pip :
+and review the napari docs for plugin developers:
+https://napari.org/stable/plugins/index.html
+-->
 
-```bash
-pip install napari[all] magicgui qtpy scikit-image
+## Installation
+
+You can install `napari_stereotypage` via [pip]:
+
+    pip install napari_stereotypage
+
+
+![](https://github.com/koopa31/napari_stereotypage/blob/38300132d34479ebbad7dd66b234d32bcb4cefb4/Image/gif_readme.gif)
+
+
+## Documentation
+
+A [documentation] is available to understand how to effectively learn how to use the plugin. 
+
+
+## Contributing
+
+Contributions are very welcome. Tests can be run with [tox], please ensure
+the coverage at least stays the same before you submit a pull request.
+
+## License
+
+Distributed under the terms of the [BSD-3] license,
+"napari_stereotypage" is free and open source software
+
+## Issues
+
+If you encounter any problems, please [file an issue] along with a detailed description.
+
+[napari]: https://github.com/napari/napari
+[Cookiecutter]: https://github.com/audreyr/cookiecutter
+[@napari]: https://github.com/napari
+[MIT]: http://opensource.org/licenses/MIT
+[BSD-3]: http://opensource.org/licenses/BSD-3-Clause
+[GNU GPL v3.0]: http://www.gnu.org/licenses/gpl-3.0.txt
+[GNU LGPL v3.0]: http://www.gnu.org/licenses/lgpl-3.0.txt
+[Apache Software License 2.0]: http://www.apache.org/licenses/LICENSE-2.0
+[Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
+[cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
+[documentation]: https://stereotyping-doc.readthedocs.io/en/latest/
+[file an issue]: https://github.com/koopa31/napari_stereotypage/issues
+
+[napari]: https://github.com/napari/napari
+[tox]: https://tox.readthedocs.io/en/latest/
+[pip]: https://pypi.org/project/pip/
+[PyPI]: https://pypi.org/
