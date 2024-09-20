@@ -8,10 +8,75 @@ import numpy as np
 import os
 import pandas as pd
 from skimage.io import imread
+import importlib.metadata
+import requests
+import subprocess
+import sys
+from qtpy.QtWidgets import QMessageBox
 
 # Importing functions from _functions.py
 from ._functions import (calcul_repere, ajuster_origine, ajuster_hauteur, transformer_coordonnees,
                          calculer_distance_physique, save_data_to_csv, draw_axes, draw_plane, draw_cone, draw_origin)
+
+
+def check_for_update(plugin_name, viewer: Viewer):
+    try:
+        # Obtenir la version installée du plugin
+        current_version = importlib.metadata.version(plugin_name)
+
+        # Récupérer la dernière version disponible sur PyPI
+        response = requests.get(f"https://pypi.org/pypi/{plugin_name}/json")
+        latest_version = response.json()["info"]["version"]
+
+        # Comparer les versions
+        if current_version != latest_version:
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setWindowTitle(f"Update Available for {plugin_name}")
+            msg_box.setText(f"A new version ({latest_version}) of {plugin_name} is available.\n"
+                            f"You are currently using version {current_version}.\n"
+                            f"Do you want to update now?")
+            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+            # Afficher la boîte de dialogue et capturer la réponse de l'utilisateur
+            result = msg_box.exec_()
+
+            if result == QMessageBox.Yes:
+                # L'utilisateur a choisi de mettre à jour
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", plugin_name])
+
+                # Demander à l'utilisateur s'il souhaite redémarrer Napari
+                restart_msg = QMessageBox()
+                restart_msg.setIcon(QMessageBox.Question)
+                restart_msg.setWindowTitle("Restart Napari")
+                restart_msg.setText("The plugin has been updated. To apply the changes, Napari needs to be restarted.\n"
+                                    "Would you like to restart now?")
+                restart_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                restart_result = restart_msg.exec_()
+
+                if restart_result == QMessageBox.Yes:
+                    # Fermer et relancer Napari
+                    restart_napari(viewer)
+                else:
+                    QMessageBox.information(None, "Update Complete",
+                                            f"{plugin_name} has been updated, but you chose not to restart Napari.")
+        else:
+            QMessageBox.information(None, "Up to Date", f"{plugin_name} is already up to date.")
+    except Exception as e:
+        if response.status_code == 404:
+            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: the plugin has not been published on pip")
+        else:
+            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: {e}")
+
+
+def restart_napari(viewer: Viewer):
+    # Fermer Napari
+    viewer.window.close()
+
+    # Relancer Napari
+    python_executable = sys.executable
+    napari_script = os.path.join(os.path.dirname(python_executable), "napari.exe")  # ou "napari" selon l'installation
+    subprocess.Popen([python_executable, "-m", "napari --with napari-stereotypage"])
 
 
 class StereotypingWidget(QWidget):
@@ -95,6 +160,9 @@ class StereotypingWidget(QWidget):
 
         self.setLayout(layout)
         self.update_instructions(0)
+
+        check_for_update(plugin_name="napari-stereotypage", viewer=self.viewer)
+
 
     def load_intro_image(self):
         """
