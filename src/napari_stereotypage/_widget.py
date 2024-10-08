@@ -64,7 +64,7 @@ def check_for_update(plugin_name, viewer: Viewer):
             QMessageBox.information(None, "Up to Date", f"{plugin_name} is already up to date.")
     except Exception as e:
         if response.status_code == 404:
-            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: the plugin has not been published on pip")
+            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: the plugin has not been published on PyPi")
         else:
             QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: {e}")
 
