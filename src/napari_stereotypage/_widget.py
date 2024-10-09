@@ -110,6 +110,27 @@ class StereotypingWidget(QWidget):
         self.hauteur_input = QLineEdit("75")
         layout.addWidget(self.hauteur_input)
 
+        layout.addWidget(QLabel("Images selection:"))
+        layout.addWidget(QLabel("Sample identifier:"))
+        self.Sample_id_imput = QLineEdit("_s")
+        layout.addWidget(self.Sample_id_imput)
+
+        layout.addWidget(QLabel("Number of colors:"))
+        self.Color_number_imput = QLineEdit("2")
+        layout.addWidget(self.Color_number_imput)
+
+        layout.addWidget(QLabel("Identifier for blue color:"))
+        self.Color_id_blue_input = QLineEdit("CSU-405 Em 440-460")
+        layout.addWidget(self.Color_id_blue_input)
+
+        layout.addWidget(QLabel("Identifier for green color:"))
+        self.Color_id_green_input = QLineEdit("CSU-488 Em 510-540")
+        layout.addWidget(self.Color_id_green_input)
+
+        layout.addWidget(QLabel("Identifier for red color:"))
+        self.Color_id_red_input = QLineEdit("CSU-561 Em 593LP")
+        layout.addWidget(self.Color_id_red_input)
+
         valider_button = QPushButton("Calculate Coordinates")
         valider_button.clicked.connect(self.calculate_coordinates)
         layout.addWidget(valider_button)
@@ -177,21 +198,68 @@ class StereotypingWidget(QWidget):
             print(f"Introductory image not found at {image_path}")
 
     def select_folder_and_load_image(self):
+        self.Sample_id = str(self.Sample_id_imput.text())
         folder = QFileDialog.getExistingDirectory(None, "Select Folder")
         if folder:
-            self.image_paths = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+            image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+            self.image_paths = []
+            while len(image_list)>0:
+                #check the substring identifying files from the same sample
+                image_test = image_list[0]
+                identifier = image_test.split(self.Sample_id)
+                identifier = self.Sample_id + identifier[1]
+                for file in image_list:
+                    # reorder image list corresponding to sample files
+                    if file.endswith(identifier):
+                        self.image_paths.append(file)
+                        image_list.remove(file)
             self.current_image_index = 0
             if self.image_paths:
                 self.viewer.layers.clear()
-                self.load_image(self.image_paths[self.current_image_index])
+                self.load_image()
                 self.update_instructions(0)
-                self.image_index.setText(str(self.current_image_index + 1))
+                self.image_index.setText(str(self.current_image_index//self.Color_number))
             else:
                 show_info("No images found in the folder.")
 
-    def load_image(self, image_path):
-        image = imread(image_path)
-        self.viewer.add_image(image, name='3D Image')
+    def load_image(self):
+        """
+        Check the color of each images from the same sample
+        Apply blending(addititve), auto-contrast and the appropriate color
+        """
+        self.Color_number = int(self.Color_number_imput.text())
+        self.Color_id_green = str(self.Color_id_green_input.text())
+        self.Color_id_blue = str(self.Color_id_blue_input.text())
+        self.Color_id_red = str(self.Color_id_red_input.text())
+        for i in range(self.Color_number):
+            image = imread(self.image_paths[self.current_image_index])
+            if self.Color_id_red in self.image_paths[self.current_image_index]:
+                self.viewer.add_image(image, name='Image red')
+                self.viewer.layers['Image red'].blending = 'additive'
+                self.viewer.layers['Image red'].colormap='red'
+                self.viewer.dims.set_point(0, len(self.viewer.layers['Image red'].data)/2)
+                self.viewer.layers['Image red'].reset_contrast_limits()
+            elif self.Color_id_green in self.image_paths[self.current_image_index]:
+                self.viewer.add_image(image, name='Image green')
+                self.viewer.layers['Image green'].blending = 'additive'
+                self.viewer.layers['Image green'].colormap='green'
+                self.viewer.dims.set_point(0, len(self.viewer.layers['Image green'].data)/2)
+                self.viewer.layers['Image green'].reset_contrast_limits()
+            elif self.Color_id_blue in self.image_paths[self.current_image_index]:
+                self.viewer.add_image(image, name='Image blue')
+                self.viewer.layers['Image blue'].blending = 'additive'
+                self.viewer.layers['Image blue'].colormap='blue'
+                self.viewer.dims.set_point(0, len(self.viewer.layers['Image blue'].data)/2)
+                self.viewer.layers['Image blue'].reset_contrast_limits()
+            else:
+                image_name = 'Image_'+str(i)
+                self.viewer.add_image(image, name=image_name)
+                self.viewer.layers[image_name].blending = 'additive'
+                self.viewer.layers[image_name].colormap='gray'
+                self.viewer.dims.set_point(0, len(self.viewer.layers[image_name].data)/2)
+                self.viewer.layers[image_name].reset_contrast_limits()
+            self.current_image_index += 1
+
         points_layer = self.viewer.add_points(ndim=3, name='Points')
         points_layer.mode = 'add'
         points_layer.events.data.connect(self.on_points_update)
@@ -235,7 +303,7 @@ class StereotypingWidget(QWidget):
             self.nouvelle_origine, hauteur_pixels = ajuster_origine(self.centre_base, sommet, self.v, hauteur_physique, dx, dy, dz)
             self.nouvelle_origine, self.v, self.w = ajuster_hauteur(self.nouvelle_origine, sommet, self.u, self.v, self.w, points, hauteur_pixels, dx, dy, dz)
 
-            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index], (self.nouvelle_origine,
+            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index-1], (self.nouvelle_origine,
                                                                                          self.u, self.v, self.w))
             self.update_instructions(8)
             if self.show_plane_checkbox.isChecked():
@@ -276,21 +344,20 @@ class StereotypingWidget(QWidget):
 
     def next_image(self):
         if self.current_image_index < len(self.image_paths) - 1:
-            self.current_image_index += 1
             self.viewer.layers.clear()
-            self.load_image(self.image_paths[self.current_image_index])
+            self.load_image()
             self.update_instructions(0)
-            self.image_index.setText(str(self.current_image_index + 1))
+            self.image_index.setText(str(self.current_image_index//self.Color_number))
         else:
             show_info("All images have been processed.")
 
     def previous_image(self):
-        if self.current_image_index > 0:
-            self.current_image_index -= 1
+        if self.current_image_index > self.Color_number:
+            self.current_image_index -= self.Color_number*2
             self.viewer.layers.clear()
-            self.load_image(self.image_paths[self.current_image_index])
+            self.load_image()
             self.update_instructions(0)
-            self.image_index.setText(str(self.current_image_index + 1))
+            self.image_index.setText(str(self.current_image_index//self.Color_number))
         else:
             show_info("You are already at the first image.")
 
