@@ -234,6 +234,7 @@ class StereotypingWidget(QWidget):
                 self.load_image()
                 self.update_instructions(0)
                 self.image_index.setText(str(self.current_image_index//self.Color_number))
+                self.total_images = len(self.image_paths) // self.Color_number
             else:
                 show_info("No images found in the folder.")
 
@@ -363,8 +364,13 @@ class StereotypingWidget(QWidget):
             self.load_image()
             self.update_instructions(0)
             self.image_index.setText(str(self.current_image_index//self.Color_number))
-            self.progress_bar.setValue(self.current_image_index // self.Color_number)
+            # Calculer le pourcentage d'avancement
+            current_group_index = self.current_image_index // self.Color_number  # Calculer le groupe d'images actuel
+            progress_percentage = int(((current_group_index - 1) / self.total_images) * 100)  # Calculer le pourcentage
+            self.progress_bar.setValue(progress_percentage)  # Mettre à jour la barre de progression
+
         else:
+            self.progress_bar.setValue(100)  # Mettre à jour la barre de progression
             show_info("All images have been processed.")
 
     def previous_image(self):
@@ -374,7 +380,11 @@ class StereotypingWidget(QWidget):
             self.load_image()
             self.update_instructions(0)
             self.image_index.setText(str(self.current_image_index//self.Color_number))
-            self.progress_bar.setValue(self.current_image_index // self.Color_number)
+            # Calculer le pourcentage d'avancement
+            current_group_index = self.current_image_index // self.Color_number  # Calculer le groupe d'images actuel
+            progress_percentage = int(((current_group_index - 1) / self.total_images) * 100)  # Calculer le pourcentage
+            self.progress_bar.setValue(progress_percentage)  # Mettre à jour la barre de progression
+
         else:
             show_info("You are already at the first image.")
 
