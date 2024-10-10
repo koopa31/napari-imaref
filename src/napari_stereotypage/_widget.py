@@ -1,6 +1,6 @@
 from napari import Viewer
 from qtpy.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QCheckBox, QHBoxLayout, QFileDialog,
-                            QFrame)
+                            QFrame, QProgressBar)
 from qtpy.QtCore import Qt
 from magicgui import magicgui
 from napari.utils.notifications import show_info
@@ -179,6 +179,11 @@ class StereotypingWidget(QWidget):
 
         layout.addWidget(instructions_frame)
 
+        # Ajouter la barre de progression
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)  # Plage par défaut, ajustée en fonction du nombre d'images
+        layout.addWidget(self.progress_bar)  # Ajouter la barre de progression en bas du layout
+
         self.setLayout(layout)
         self.update_instructions(0)
 
@@ -214,6 +219,10 @@ class StereotypingWidget(QWidget):
                         self.image_paths.append(file)
                         image_list.remove(file)
             self.current_image_index = 0
+
+            self.progress_bar.setMaximum(len(self.image_paths))  # Ajuster la plage selon le nombre d'images
+            self.progress_bar.setValue(0)  # Réinitialiser la progression
+
             if self.image_paths:
                 self.viewer.layers.clear()
                 self.load_image()
@@ -348,6 +357,7 @@ class StereotypingWidget(QWidget):
             self.load_image()
             self.update_instructions(0)
             self.image_index.setText(str(self.current_image_index//self.Color_number))
+            self.progress_bar.setValue(self.current_image_index // self.Color_number)
         else:
             show_info("All images have been processed.")
 
@@ -358,6 +368,7 @@ class StereotypingWidget(QWidget):
             self.load_image()
             self.update_instructions(0)
             self.image_index.setText(str(self.current_image_index//self.Color_number))
+            self.progress_bar.setValue(self.current_image_index // self.Color_number)
         else:
             show_info("You are already at the first image.")
 
