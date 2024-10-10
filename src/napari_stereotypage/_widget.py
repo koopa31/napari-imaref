@@ -211,13 +211,16 @@ class StereotypingWidget(QWidget):
             while len(image_list)>0:
                 #check the substring identifying files from the same sample
                 image_test = image_list[0]
-                identifier = image_test.split(self.Sample_id)
-                identifier = self.Sample_id + identifier[1]
-                for file in image_list:
-                    # reorder image list corresponding to sample files
-                    if file.endswith(identifier):
-                        self.image_paths.append(file)
-                        image_list.remove(file)
+                if not self.Sample_id in image_test:
+                    image_list.remove(image_test)
+                else:
+                    identifier = image_test.split(self.Sample_id)
+                    identifier = self.Sample_id + identifier[1]
+                    for file in image_list:
+                        # reorder image list corresponding to sample files
+                        if file.endswith(identifier):
+                            self.image_paths.append(file)
+                            image_list.remove(file)
             self.current_image_index = 0
 
             self.progress_bar.setMaximum(len(self.image_paths))  # Ajuster la plage selon le nombre d'images
