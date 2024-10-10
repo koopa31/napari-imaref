@@ -318,7 +318,7 @@ class StereotypingWidget(QWidget):
 
             print("Height of the origin in Z: ", self.nouvelle_origine[0])
             print("Distance to apex in µm: ", calculer_distance_physique(self.viewer.layers["Points"].data[0],
-                                                                         self.viewer.layers["Origine"].data[0],
+                                                                         self.nouvelle_origine,
                                                                          dx, dy, dz))
 
     def calculate_new_coordinates(self):
