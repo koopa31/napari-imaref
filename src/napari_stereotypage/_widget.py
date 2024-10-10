@@ -179,6 +179,12 @@ class StereotypingWidget(QWidget):
 
         layout.addWidget(instructions_frame)
 
+        # Add a label for the progress bar
+        self.progress_label = QLabel("Progress of processed images:")
+        self.progress_label.setStyleSheet(
+            "font-size: 16px; font-family: Arial;")  # Optional style to make the text look nicer
+        layout.addWidget(self.progress_label)
+
         # Ajouter la barre de progression
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)  # Plage par défaut, ajustée en fonction du nombre d'images
@@ -222,9 +228,6 @@ class StereotypingWidget(QWidget):
                             self.image_paths.append(file)
                             image_list.remove(file)
             self.current_image_index = 0
-
-            self.progress_bar.setMaximum(len(self.image_paths))  # Ajuster la plage selon le nombre d'images
-            self.progress_bar.setValue(0)  # Réinitialiser la progression
 
             if self.image_paths:
                 self.viewer.layers.clear()
@@ -318,6 +321,10 @@ class StereotypingWidget(QWidget):
             csv_filename = save_data_to_csv(self.image_paths[self.current_image_index-1], (self.nouvelle_origine,
                                                                                          self.u, self.v, self.w))
             self.update_instructions(8)
+            print("Height of the origin in Z: ", self.nouvelle_origine[0])
+            print("Distance to apex in µm: ", calculer_distance_physique(self.viewer.layers["Points"].data[0],
+                                                                         self.nouvelle_origine,
+                                                                         dx, dy, dz))
             if self.show_plane_checkbox.isChecked():
                 draw_plane(self.viewer, sommet, vecteur_v)
             if self.show_cone_checkbox.isChecked():
@@ -328,10 +335,6 @@ class StereotypingWidget(QWidget):
             else:
                 self.next_image()
 
-            print("Height of the origin in Z: ", self.nouvelle_origine[0])
-            print("Distance to apex in µm: ", calculer_distance_physique(self.viewer.layers["Points"].data[0],
-                                                                         self.nouvelle_origine,
-                                                                         dx, dy, dz))
 
     def calculate_new_coordinates(self):
         if "Plan" in self.viewer.layers:
