@@ -26,7 +26,8 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
         current_version = importlib.metadata.version(plugin_name)
 
         # Fetch the latest version available on PyPI
-        response = requests.get(f"https://pypi.org/pypi/{plugin_name}/json")
+        #TODO: virer test. quand ça sera déployé
+        response = requests.get(f"https://test.pypi.org/pypi/{plugin_name}/json")
         latest_version = response.json()["info"]["version"]
 
         # Compare versions using packaging.version
