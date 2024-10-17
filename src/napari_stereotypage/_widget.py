@@ -1,6 +1,6 @@
 from napari import Viewer
 from qtpy.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QCheckBox, QHBoxLayout, QFileDialog,
-                            QFrame, QProgressBar)
+                            QFrame, QProgressBar, QGroupBox, QSizePolicy)
 from qtpy.QtCore import Qt
 from magicgui import magicgui
 from napari.utils.notifications import show_info
@@ -70,6 +70,57 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
             QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: {e}")
 
 
+
+class CollapsibleGroupBox(QGroupBox):
+    def __init__(self, title="", parent=None):
+        super().__init__(parent)
+        self.setTitle(title)  # Ne pas afficher le titre dans le QGroupBox
+        self.setCheckable(False)
+
+        # Ajouter le bouton flèche
+        self.toggle_button = QPushButton(title)
+        self.toggle_button.setCheckable(True)
+        self.toggle_button.setChecked(False)
+        self.toggle_button.setFixedSize(20, 25)
+        self.toggle_button.setStyleSheet("QPushButton { border: none; }")
+        self.update_arrow()
+        self.toggle_button.clicked.connect(self.toggle)
+
+        # Ajouter le bouton flèche au titre du QGroupBox
+        title_layout = QHBoxLayout()
+        title_layout.addWidget(self.toggle_button)
+        title_layout.addStretch()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(QVBoxLayout())
+        self.layout().addLayout(title_layout)
+
+        # Créer la zone de contenu pour le QGroupBox
+        self.content_area = QWidget()
+        self.content_area.setMaximumHeight(0)
+        self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.layout().addWidget(self.content_area)
+
+    def toggle(self):
+        # Bascule entre déplié et replié
+        if self.toggle_button.isChecked():
+            self.content_area.setMaximumHeight(16777215)  # Permettre l'expansion
+        else:
+            self.content_area.setMaximumHeight(0)
+        self.update_arrow()
+
+    def setContentLayout(self, layout):
+        # Définir le layout de la zone de contenu
+        self.content_area.setLayout(layout)
+
+    def update_arrow(self):
+        # Mettre à jour la flèche selon l'état déplié/replié
+        if self.toggle_button.isChecked():
+            self.toggle_button.setText("▼")  # Flèche vers le bas pour indiquer "déplié"
+        else:
+            self.toggle_button.setText("▶")
+
+
+
 class StereotypingWidget(QWidget):
     def __init__(self, viewer: Viewer):
         super().__init__()
@@ -78,50 +129,63 @@ class StereotypingWidget(QWidget):
         self.load_intro_image()
 
     def initUI(self):
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
 
         select_folder_button = QPushButton("Select Folder")
         select_folder_button.clicked.connect(self.select_folder_and_load_image)
         layout.addWidget(select_folder_button)
 
-        layout.addWidget(QLabel("Resolution:"))
-        layout.addWidget(QLabel("dx:"))
+        # Section déroulante pour les réglages de résolution
+        resolution_section = CollapsibleGroupBox("Resolution Settings")
+        resolution_layout = QVBoxLayout()
+
+        resolution_layout.addWidget(QLabel("dx (µm/pixel):"))
         self.dx_input = QLineEdit("0.569")
-        layout.addWidget(self.dx_input)
+        resolution_layout.addWidget(self.dx_input)
 
-        layout.addWidget(QLabel("dy:"))
+        resolution_layout.addWidget(QLabel("dy (µm/pixel):"))
         self.dy_input = QLineEdit("0.569")
-        layout.addWidget(self.dy_input)
+        resolution_layout.addWidget(self.dy_input)
 
-        layout.addWidget(QLabel("dz:"))
+        resolution_layout.addWidget(QLabel("dz (µm/pixel):"))
         self.dz_input = QLineEdit("0.5")
-        layout.addWidget(self.dz_input)
+        resolution_layout.addWidget(self.dz_input)
 
-        layout.addWidget(QLabel("Cone Height:"))
+        resolution_layout.addWidget(QLabel("Cone Height (µm):"))
         self.hauteur_input = QLineEdit("75")
-        layout.addWidget(self.hauteur_input)
+        resolution_layout.addWidget(self.hauteur_input)
 
-        layout.addWidget(QLabel("Images selection:"))
-        layout.addWidget(QLabel("Sample identifier:"))
+        resolution_section.setContentLayout(resolution_layout)
+        layout.addWidget(resolution_section)
+
+        # Section déroulante pour la sélection d'images
+        image_selection_section = CollapsibleGroupBox("Image Selection")
+        image_selection_layout = QVBoxLayout()
+
+        image_selection_layout.addWidget(QLabel("Sample identifier:"))
         self.Sample_id_imput = QLineEdit("_s")
-        layout.addWidget(self.Sample_id_imput)
+        image_selection_layout.addWidget(self.Sample_id_imput)
 
-        layout.addWidget(QLabel("Number of colors:"))
+        image_selection_layout.addWidget(QLabel("Number of colors:"))
         self.Color_number_imput = QLineEdit("2")
-        layout.addWidget(self.Color_number_imput)
+        image_selection_layout.addWidget(self.Color_number_imput)
 
-        layout.addWidget(QLabel("Identifier for blue color:"))
+        image_selection_layout.addWidget(QLabel("Identifier for blue color:"))
         self.Color_id_blue_input = QLineEdit("CSU-405 Em 440-460")
-        layout.addWidget(self.Color_id_blue_input)
+        image_selection_layout.addWidget(self.Color_id_blue_input)
 
-        layout.addWidget(QLabel("Identifier for green color:"))
+        image_selection_layout.addWidget(QLabel("Identifier for green color:"))
         self.Color_id_green_input = QLineEdit("CSU-488 Em 510-540")
-        layout.addWidget(self.Color_id_green_input)
+        image_selection_layout.addWidget(self.Color_id_green_input)
 
-        layout.addWidget(QLabel("Identifier for red color:"))
+        image_selection_layout.addWidget(QLabel("Identifier for red color:"))
         self.Color_id_red_input = QLineEdit("CSU-561 Em 593LP")
-        layout.addWidget(self.Color_id_red_input)
+        image_selection_layout.addWidget(self.Color_id_red_input)
 
+        image_selection_section.setContentLayout(image_selection_layout)
+        layout.addWidget(image_selection_section)
+
+        # Ajouter les autres composants de l'interface utilisateur
         valider_button = QPushButton("Calculate Coordinates")
         valider_button.clicked.connect(self.calculate_coordinates)
         layout.addWidget(valider_button)
