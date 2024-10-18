@@ -142,11 +142,6 @@ class StereotypingWidget(QWidget):
     def initUI(self):
         layout = QVBoxLayout(self)
 
-        select_folder_button = QPushButton("Select Folder")
-        select_folder_button.setToolTip("Open the folder containing the images to process")
-        select_folder_button.clicked.connect(self.select_folder_and_load_image)
-        layout.addWidget(select_folder_button)
-
         # Section déroulante pour les réglages de résolution
         resolution_section = CollapsibleGroupBox("Resolution Settings")
         resolution_layout = QVBoxLayout()
@@ -197,28 +192,40 @@ class StereotypingWidget(QWidget):
         image_selection_section.setContentLayout(image_selection_layout)
         layout.addWidget(image_selection_section)
 
+        select_folder_button = QPushButton("Select Folder")
+        select_folder_button.setToolTip("Open the folder containing the images to process")
+        select_folder_button.clicked.connect(self.select_folder_and_load_image)
+        layout.addWidget(select_folder_button)
+
+        # Section déroulante pour le calcul
+        computation_section = CollapsibleGroupBox("Computation section")
+        computation_layout = QVBoxLayout()
+
         # Ajouter les autres composants de l'interface utilisateur
         valider_button = QPushButton("Calculate Coordinates")
         valider_button.setToolTip("Computation of the reference frame")
         valider_button.clicked.connect(self.calculate_coordinates)
-        layout.addWidget(valider_button)
+        computation_layout.addWidget(valider_button)
 
         calculer_coords_button = QPushButton("Calculate Coordinates in New Frame")
         calculer_coords_button.setToolTip("Computation of new points coordinates in the previously computed reference frame")
         calculer_coords_button.clicked.connect(self.calculate_new_coordinates)
-        layout.addWidget(calculer_coords_button)
+        computation_layout.addWidget(calculer_coords_button)
 
         self.show_axes_checkbox = QCheckBox("Show Axes")
         self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
-        layout.addWidget(self.show_axes_checkbox)
+        computation_layout.addWidget(self.show_axes_checkbox)
 
         self.show_cone_checkbox = QCheckBox("Show Cone")
         self.show_cone_checkbox.setToolTip("Show the cone containing the orthonormal frame")
-        layout.addWidget(self.show_cone_checkbox)
+        computation_layout.addWidget(self.show_cone_checkbox)
 
         self.show_plane_checkbox = QCheckBox("Show Plane")
         self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
-        layout.addWidget(self.show_plane_checkbox)
+        computation_layout.addWidget(self.show_plane_checkbox)
+
+        computation_section.setContentLayout(computation_layout)
+        layout.addWidget(computation_section)
 
         # Layout to switch from an image to another
         navigation_layout = QHBoxLayout()
