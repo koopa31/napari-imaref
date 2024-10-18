@@ -223,15 +223,18 @@ class StereotypingWidget(QWidget):
         # Layout to switch from an image to another
         navigation_layout = QHBoxLayout()
         previous_button = QPushButton("<")
+        previous_button.setToolTip("Previous image")
         previous_button.clicked.connect(self.previous_image)
         navigation_layout.addWidget(previous_button)
 
         self.image_index = QLineEdit("1")
+        self.image_index.setToolTip("Image index")
         self.image_index.setReadOnly(True)
         self.image_index.setAlignment(Qt.AlignCenter)
         navigation_layout.addWidget(self.image_index)
 
         next_button = QPushButton(">")
+        next_button.setToolTip("Next image")
         next_button.clicked.connect(self.next_image)
         navigation_layout.addWidget(next_button)
 
@@ -266,6 +269,12 @@ class StereotypingWidget(QWidget):
 
         # Vertical spacing to separate the doc from the rest of the layout
         layout.addSpacing(80)
+
+        # Ajout du texte d'aide pour la première utilisation
+        first_time_label = QLabel("First time using this tool? <br>Check the documentation for guidance!")
+        first_time_label.setStyleSheet("font-size: 18px; font-family: Arial; color: white;")  # Style optionnel
+        first_time_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(first_time_label)
 
         # Link to the documentation
         open_doc_button = QPushButton("DOCUMENTATION")
