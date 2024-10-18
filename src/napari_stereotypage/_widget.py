@@ -47,7 +47,8 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
 
             if result == QMessageBox.Yes:
                 # The user chose to update
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", plugin_name])
+                # TODO: virer "-i https://test.pypi.org/simple/" quand ça sera déployé
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "-i",  "https://test.pypi.org/simple/", plugin_name])
 
                 # Ask the user if they want to restart Napari
                 restart_msg = QMessageBox()
