@@ -343,8 +343,8 @@ class StereotypingWidget(QWidget):
             "Place the second point to define the plane.",
             "Place the third point to define the plane.",
             "Place the fourth point to define the plane.",
-            "Place the embryo's top point.",
-            "Place the embryo's bottom point.",
+            "Place the embryo's dorsal point.",
+            "Place the embryo's ventral point.",
             "Place a point on the base perimeter.",
             "Click 'Calculate Coordinates' to start the calculations."
         ]
