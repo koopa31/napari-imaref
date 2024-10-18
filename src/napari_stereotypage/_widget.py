@@ -207,6 +207,19 @@ class StereotypingWidget(QWidget):
         calculer_coords_button.clicked.connect(self.calculate_new_coordinates)
         layout.addWidget(calculer_coords_button)
 
+        self.show_axes_checkbox = QCheckBox("Show Axes")
+        self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
+        layout.addWidget(self.show_axes_checkbox)
+
+        self.show_cone_checkbox = QCheckBox("Show Cone")
+        self.show_cone_checkbox.setToolTip("Show the cone containing the orthonormal frame")
+        layout.addWidget(self.show_cone_checkbox)
+
+        self.show_plane_checkbox = QCheckBox("Show Plane")
+        self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
+        layout.addWidget(self.show_plane_checkbox)
+
+        # Layout to switch from an image to another
         navigation_layout = QHBoxLayout()
         previous_button = QPushButton("<")
         previous_button.clicked.connect(self.previous_image)
@@ -223,18 +236,7 @@ class StereotypingWidget(QWidget):
 
         layout.addLayout(navigation_layout)
 
-        self.show_axes_checkbox = QCheckBox("Show Axes")
-        self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
-        layout.addWidget(self.show_axes_checkbox)
-
-        self.show_cone_checkbox = QCheckBox("Show Cone")
-        self.show_cone_checkbox.setToolTip("Show the cone containing the orthonormal frame")
-        layout.addWidget(self.show_cone_checkbox)
-
-        self.show_plane_checkbox = QCheckBox("Show Plane")
-        self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
-        layout.addWidget(self.show_plane_checkbox)
-
+        # Layout which shows the instructions
         instructions_frame = QFrame()
         instructions_frame.setFrameShape(QFrame.Box)
         instructions_frame.setFrameShadow(QFrame.Raised)
