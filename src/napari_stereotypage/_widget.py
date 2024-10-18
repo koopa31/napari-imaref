@@ -88,6 +88,7 @@ class CollapsibleGroupBox(QGroupBox):
 
         # Ajouter le bouton flèche
         self.toggle_button = QPushButton(title)
+        self.toggle_button.setToolTip("Click to show or hide additional options.")
         self.toggle_button.setCheckable(True)
         self.toggle_button.setChecked(False)
         self.toggle_button.setFixedSize(20, 25)
@@ -141,6 +142,7 @@ class StereotypingWidget(QWidget):
         layout = QVBoxLayout(self)
 
         select_folder_button = QPushButton("Select Folder")
+        select_folder_button.setToolTip("Open the folder containing the images to process")
         select_folder_button.clicked.connect(self.select_folder_and_load_image)
         layout.addWidget(select_folder_button)
 
@@ -196,10 +198,12 @@ class StereotypingWidget(QWidget):
 
         # Ajouter les autres composants de l'interface utilisateur
         valider_button = QPushButton("Calculate Coordinates")
+        valider_button.setToolTip("Computation of the reference frame")
         valider_button.clicked.connect(self.calculate_coordinates)
         layout.addWidget(valider_button)
 
         calculer_coords_button = QPushButton("Calculate Coordinates in New Frame")
+        calculer_coords_button.setToolTip("Computation of new points coordinates in the previously computed reference frame")
         calculer_coords_button.clicked.connect(self.calculate_new_coordinates)
         layout.addWidget(calculer_coords_button)
 
@@ -220,12 +224,15 @@ class StereotypingWidget(QWidget):
         layout.addLayout(navigation_layout)
 
         self.show_axes_checkbox = QCheckBox("Show Axes")
+        self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
         layout.addWidget(self.show_axes_checkbox)
 
         self.show_cone_checkbox = QCheckBox("Show Cone")
+        self.show_cone_checkbox.setToolTip("Show the cone containing the orthonormal frame")
         layout.addWidget(self.show_cone_checkbox)
 
         self.show_plane_checkbox = QCheckBox("Show Plane")
+        self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
         layout.addWidget(self.show_plane_checkbox)
 
         instructions_frame = QFrame()
@@ -254,8 +261,13 @@ class StereotypingWidget(QWidget):
         self.progress_bar.setRange(0, 100)  # Plage par défaut, ajustée en fonction du nombre d'images
         layout.addWidget(self.progress_bar)  # Ajouter la barre de progression en bas du layout
 
+        # Vertical spacing to separate the doc from the rest of the layout
+        layout.addSpacing(80)
+
         # Link to the documentation
         open_doc_button = QPushButton("DOCUMENTATION")
+        open_doc_button.setToolTip("Open the online documentation")
+        # Check if internet connection is working to set the icon, else do nothing
         try:
             url = "https://bitbucket.org/koopa31/napari_svetlana/raw/c7438ec591fa5e23f03cfb17f4984e9f52571649/src/doc.png"
             response = requests.get(url)
