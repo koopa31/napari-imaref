@@ -13,6 +13,7 @@ import requests
 import subprocess
 import sys
 from qtpy.QtWidgets import QMessageBox
+from qtpy.QtGui import QIcon, QPixmap
 from packaging import version
 
 # Importing functions from _functions.py
@@ -26,8 +27,9 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
         current_version = importlib.metadata.version(plugin_name)
 
         # Fetch the latest version available on PyPI
-        #TODO: virer test. quand ça sera déployé
+        # TODO: virer test. quand ça sera déployé
         response = requests.get(f"https://test.pypi.org/pypi/{plugin_name}/json")
+        response.raise_for_status()  # Raise an exception for HTTP errors
         latest_version = response.json()["info"]["version"]
 
         # Compare versions using packaging.version
@@ -63,11 +65,18 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
                                             f"{plugin_name} has been updated, but you chose not to restart Napari.")
         else:
             QMessageBox.information(None, "Up to Date", f"{plugin_name} is already up to date.")
+
+    except requests.exceptions.HTTPError as http_err:
+        # Manage specific HTTP errors (e.g. 404)
+        QMessageBox.critical(None, "Error", f"HTTP error occurred: {http_err}")
+
+    except requests.exceptions.ConnectionError as conn_err:
+        # Manage network-related errors
+        QMessageBox.critical(None, "Error", f"Connection error occurred: {conn_err}")
+
     except Exception as e:
-        if response.status_code == 404:
-            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: it seems the plugin cannot be found on PyPi")
-        else:
-            QMessageBox.critical(None, "Error", f"An error occurred while checking for updates: {e}")
+        # Manage any other exceptions
+        QMessageBox.critical(None, "Error", f"An unexpected error occurred: {e}")
 
 
 
@@ -245,6 +254,22 @@ class StereotypingWidget(QWidget):
         self.progress_bar.setRange(0, 100)  # Plage par défaut, ajustée en fonction du nombre d'images
         layout.addWidget(self.progress_bar)  # Ajouter la barre de progression en bas du layout
 
+        # Link to the documentation
+        open_doc_button = QPushButton("DOCUMENTATION")
+        try:
+            url = "https://bitbucket.org/koopa31/napari_svetlana/raw/c7438ec591fa5e23f03cfb17f4984e9f52571649/src/doc.png"
+            response = requests.get(url)
+            pixmap = QPixmap()
+            pixmap.loadFromData(response.content)
+            icon = QIcon(pixmap)
+            open_doc_button.setIcon(icon)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to load documentation button icon: {e}")
+            pass
+        open_doc_button.clicked.connect(self.open_doc)
+        layout.addWidget(open_doc_button)
+
+        # Set the layout
         self.setLayout(layout)
         self.update_instructions(0)
 
@@ -262,6 +287,10 @@ class StereotypingWidget(QWidget):
             self.viewer.add_image(im_accueil, name="Intro Image")
         else:
             print(f"Introductory image not found at {image_path}")
+
+    def open_doc(self):
+        import webbrowser
+        webbrowser.open("https://stereotyping-doc.readthedocs.io/en/latest/index.html#")
 
     def select_folder_and_load_image(self):
         self.Sample_id = str(self.Sample_id_imput.text())
