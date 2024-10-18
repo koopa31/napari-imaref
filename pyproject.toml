@@ -65,6 +65,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
+"napari_stereotypage" = ["Image/*.webp"]  # Inclure les fichiers webp du dossier image
 "*" = ["*.yaml"]
 
 

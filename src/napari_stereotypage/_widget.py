@@ -296,7 +296,7 @@ class StereotypingWidget(QWidget):
         Load and display the introductory image when the widget is initialized.
         """
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(script_dir, os.pardir, os.pardir, "Image", "Image_accueil.webp")
+        image_path = os.path.join(script_dir, "Image", "Image_accueil.webp")
         if os.path.exists(image_path):
             im_accueil = imread(image_path)
             self.viewer.add_image(im_accueil, name="Intro Image")
