@@ -236,7 +236,8 @@ class StereotypingWidget(QWidget):
 
         self.image_index = QLineEdit("1")
         self.image_index.setToolTip("Image index")
-        self.image_index.setReadOnly(True)
+        self.image_index.setReadOnly(False)  # Rendre le champ éditable
+        self.image_index.textChanged.connect(self.on_image_index_changed)  # Connecter le changement de texte
         self.image_index.setAlignment(Qt.AlignCenter)
         navigation_layout.addWidget(self.image_index)
 
@@ -472,6 +473,20 @@ class StereotypingWidget(QWidget):
             df[f"Point {len(points_layer.data) - 8} Coordinates"] = [new_coords]
             df.to_csv(csv_filename, index=False)
             print(f"Coordinates in the new frame: {new_coords}")
+
+    def on_image_index_changed(self):
+        try:
+            new_index = int(self.image_index.text())
+            if 0 < new_index <= self.total_images:
+                self.current_image_index = (new_index - 1) * self.Color_number
+                self.viewer.layers.clear()
+                self.load_image()
+                progress_percentage = int((new_index - 1) / self.total_images * 100)
+                self.progress_bar.setValue(progress_percentage)
+            else:
+                show_info(f"Please enter a valid index between 1 and {self.total_images}.")
+        except ValueError:
+            show_info("Please enter a valid number for the image index.")
 
     def next_image(self):
         if self.current_image_index < len(self.image_paths) - 1:
