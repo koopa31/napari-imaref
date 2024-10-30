@@ -64,8 +64,9 @@ def check_for_update(plugin_name="napari-stereotypage", viewer=None):
                 else:
                     QMessageBox.information(None, "Update Complete",
                                             f"{plugin_name} has been updated, but you chose not to restart Napari.")
-        else:
-            QMessageBox.information(None, "Up to Date", f"{plugin_name} is already up to date.")
+        # Useless to know it is already up to date
+        """else:
+            QMessageBox.information(None, "Up to Date", f"{plugin_name} is already up to date.")"""
 
     except requests.exceptions.HTTPError as http_err:
         # Manage specific HTTP errors (e.g. 404)
