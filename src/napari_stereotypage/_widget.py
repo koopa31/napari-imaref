@@ -368,45 +368,49 @@ class StereotypingWidget(QWidget):
 
     def load_image(self):
         """
-        Check the color of each images from the same sample
-        Apply blending(addititve), auto-contrast and the appropriate color
+        Check the color of each image from the same sample
+        Apply blending (additive), auto-contrast, and the appropriate color.
         """
+        # Récupération des paramètres nécessaires
         self.Color_number = int(self.Color_number_imput.text())
         self.Color_id_green = str(self.Color_id_green_input.text())
         self.Color_id_blue = str(self.Color_id_blue_input.text())
         self.Color_id_red = str(self.Color_id_red_input.text())
-        for i in range(self.Color_number):
-            image = imread(self.image_paths[self.current_image_index])
-            if self.Color_id_red in self.image_paths[self.current_image_index]:
-                self.viewer.add_image(image, name='Image red')
-                self.viewer.layers['Image red'].blending = 'additive'
-                self.viewer.layers['Image red'].colormap='red'
-                self.viewer.dims.set_point(0, len(self.viewer.layers['Image red'].data)/2)
-                self.viewer.layers['Image red'].reset_contrast_limits()
-            elif self.Color_id_green in self.image_paths[self.current_image_index]:
-                self.viewer.add_image(image, name='Image green')
-                self.viewer.layers['Image green'].blending = 'additive'
-                self.viewer.layers['Image green'].colormap='green'
-                self.viewer.dims.set_point(0, len(self.viewer.layers['Image green'].data)/2)
-                self.viewer.layers['Image green'].reset_contrast_limits()
-            elif self.Color_id_blue in self.image_paths[self.current_image_index]:
-                self.viewer.add_image(image, name='Image blue')
-                self.viewer.layers['Image blue'].blending = 'additive'
-                self.viewer.layers['Image blue'].colormap='blue'
-                self.viewer.dims.set_point(0, len(self.viewer.layers['Image blue'].data)/2)
-                self.viewer.layers['Image blue'].reset_contrast_limits()
-            else:
-                image_name = 'Image_'+str(i)
-                self.viewer.add_image(image, name=image_name)
-                self.viewer.layers[image_name].blending = 'additive'
-                self.viewer.layers[image_name].colormap='gray'
-                self.viewer.dims.set_point(0, len(self.viewer.layers[image_name].data)/2)
-                self.viewer.layers[image_name].reset_contrast_limits()
-            self.current_image_index += 1
 
+        # Chargement des images en fonction de current_image_index
+        start_index = self.current_image_index
+        end_index = start_index + self.Color_number
+
+        for i, image_path in enumerate(self.image_paths[start_index:end_index]):
+            image = imread(image_path)
+
+            # Déterminer la couleur basée sur l'identifiant
+            if self.Color_id_red in image_path:
+                layer_name = 'Image red'
+                colormap = 'red'
+            elif self.Color_id_green in image_path:
+                layer_name = 'Image green'
+                colormap = 'green'
+            elif self.Color_id_blue in image_path:
+                layer_name = 'Image blue'
+                colormap = 'blue'
+            else:
+                layer_name = f'Image_{i}'
+                colormap = 'gray'
+
+            # Ajouter l'image à Napari avec les paramètres
+            self.viewer.add_image(image, name=layer_name)
+            self.viewer.layers[layer_name].blending = 'additive'
+            self.viewer.layers[layer_name].colormap = colormap
+            self.viewer.dims.set_point(0, len(self.viewer.layers[layer_name].data) / 2)
+            self.viewer.layers[layer_name].reset_contrast_limits()
+
+        # Ajouter un calque de points pour l'annotation
         points_layer = self.viewer.add_points(ndim=3, name='Points')
         points_layer.mode = 'add'
         points_layer.events.data.connect(self.on_points_update)
+
+        # Affichage en 2D
         self.viewer.dims.ndisplay = 2
 
     def update_instructions(self, num_points):
@@ -486,6 +490,30 @@ class StereotypingWidget(QWidget):
             df.to_csv(csv_filename, index=False)
             print(f"Coordinates in the new frame: {new_coords}")
 
+    def update_ui_for_image_change(self, index):
+        """Central method to update UI elements when the image changes."""
+        if index < 0 or index >= self.total_images:
+            show_info("Invalid image index.")
+            return
+
+        self.current_image_index = index * self.Color_number  # Calculer l'indice de départ
+        self.viewer.layers.clear()  # Nettoyer les calques existants
+        self.load_image()  # Charger les images
+
+        # Mettre à jour les widgets sans déclencher d'événements redondants
+        self.image_index.blockSignals(True)
+        self.image_selector.blockSignals(True)
+
+        self.image_index.setText(str(index + 1))  # Met à jour l'indice affiché
+        self.image_selector.setCurrentIndex(index)  # Met à jour la sélection
+        self.progress_bar.setValue(int((index / self.total_images) * 100))  # Barre de progression
+
+        self.image_index.blockSignals(False)
+        self.image_selector.blockSignals(False)
+
+        # Réinitialiser les instructions
+        self.update_instructions(0)
+
     def load_image_at_index(self, index):
         """Load the image at the specified index and update UI elements."""
         # Mettre à jour l'index de l'image courante
@@ -509,48 +537,36 @@ class StereotypingWidget(QWidget):
             self.load_image_at_index(index)
 
     def on_image_index_changed(self):
+        """Handle manual changes to the image index field."""
         try:
-            new_index = int(self.image_index.text()) - 1  # Ajuster pour correspondre à l'indice zéro
-            if hasattr(self, 'total_images') and 0 <= new_index < self.total_images:
-                self.load_image_at_index(new_index)
+            new_index = int(self.image_index.text()) - 1  # Convertir en index basé sur 0
+            current_group = self.current_image_index // self.Color_number
+
+            # Ne rien faire si l'image actuelle est déjà sélectionnée
+            """if new_index == current_group:
+                return"""
+
+            if 0 <= new_index < self.total_images:
+                self.update_ui_for_image_change(new_index)
             else:
-                show_info(f"Please enter a valid index between 1 and {getattr(self, 'total_images', 'N/A')}.")
+                show_info(f"Please enter a valid index between 1 and {self.total_images}.")
         except ValueError:
-            show_info("Please enter a valid number for the image index.")
+            show_info("Please enter a valid number.")
 
     def next_image(self):
-        if self.current_image_index < len(self.image_paths) - self.Color_number:
-            # Calculer l'index de l'image suivante en augmentant le groupe actuel de 1
-            new_index = (self.current_image_index // self.Color_number) + 1
-
-            # Charger l'image suivante et mettre à jour l'interface
-            self.load_image_at_index(new_index)
-            self.update_instructions(0)  # Réinitialiser les instructions
-
-            # Mettre à jour l'affichage de l'index dans image_index
-            self.image_index.setText(str(new_index + 1))
-
-            # Calculer le pourcentage d'avancement et mettre à jour la barre de progression
-            progress_percentage = int((new_index / self.total_images) * 100)
-            self.progress_bar.setValue(progress_percentage)
+        """Navigate to the next image."""
+        current_group = self.current_image_index // self.Color_number
+        if current_group + 1 < self.total_images:
+            self.update_ui_for_image_change(current_group + 1)
         else:
-            show_info("All images have been processed.")
+            self.progress_bar.setValue(100)
+            show_info("You have reached the last image.")
 
     def previous_image(self):
-        if self.current_image_index >= self.Color_number:
-            # Calculer l'index de l'image précédente en décrémentant le groupe actuel de 1
-            new_index = (self.current_image_index // self.Color_number) - 1
-
-            # Charger l'image précédente et mettre à jour l'interface
-            self.load_image_at_index(new_index)
-            self.update_instructions(0)  # Réinitialiser les instructions
-
-            # Mettre à jour l'affichage de l'index dans image_index
-            self.image_index.setText(str(new_index + 1))
-
-            # Calculer le pourcentage d'avancement et mettre à jour la barre de progression
-            progress_percentage = int((new_index / self.total_images) * 100)
-            self.progress_bar.setValue(progress_percentage)
+        """Navigate to the previous image."""
+        current_group = self.current_image_index // self.Color_number
+        if current_group - 1 >= 0:
+            self.update_ui_for_image_change(current_group - 1)
         else:
             show_info("You are already at the first image.")
 
