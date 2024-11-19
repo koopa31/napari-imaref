@@ -543,8 +543,8 @@ class StereotypingWidget(QWidget):
             current_group = self.current_image_index // self.Color_number
 
             # Ne rien faire si l'image actuelle est déjà sélectionnée
-            """if new_index == current_group:
-                return"""
+            if new_index == current_group:
+                return
 
             if 0 <= new_index < self.total_images:
                 self.update_ui_for_image_change(new_index)
