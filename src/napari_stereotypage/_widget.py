@@ -12,7 +12,7 @@ import importlib.metadata
 import requests
 import subprocess
 import sys
-from qtpy.QtWidgets import QMessageBox
+from qtpy.QtWidgets import QMessageBox, QComboBox
 from qtpy.QtGui import QIcon, QPixmap
 from packaging import version
 
@@ -247,6 +247,12 @@ class StereotypingWidget(QWidget):
         next_button.clicked.connect(self.next_image)
         navigation_layout.addWidget(next_button)
 
+        # Dropdown menu to select image identifier
+        self.image_selector = QComboBox()
+        self.image_selector.setToolTip("Select an image by identifier")
+        self.image_selector.currentIndexChanged.connect(self.on_image_selector_changed)  # Connect selection change
+        navigation_layout.addWidget(self.image_selector)
+
         layout.addLayout(navigation_layout)
 
         # Layout which shows the instructions
@@ -327,6 +333,7 @@ class StereotypingWidget(QWidget):
 
     def select_folder_and_load_image(self):
         self.Sample_id = str(self.Sample_id_imput.text())
+        self.Color_number = int(self.Color_number_imput.text())  # Convert Color_number_imput to integer
         folder = QFileDialog.getExistingDirectory(None, "Select Folder")
         if folder:
             image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
@@ -347,11 +354,15 @@ class StereotypingWidget(QWidget):
             self.current_image_index = 0
 
             if self.image_paths:
-                self.viewer.layers.clear()
-                self.load_image()
-                self.update_instructions(0)
-                self.image_index.setText(str(self.current_image_index//self.Color_number))
+                self.image_selector.clear()
                 self.total_images = len(self.image_paths) // self.Color_number
+
+                # Ajouter des identifiants dans le menu déroulant en fonction de Sample_id
+                unique_identifiers = [f"{self.Sample_id}{i}" for i in range(1, self.total_images + 1)]
+                self.image_selector.addItems(unique_identifiers)
+
+                # Charger la première image
+                self.load_image_at_index(0)
             else:
                 show_info("No images found in the folder.")
 
@@ -475,47 +486,71 @@ class StereotypingWidget(QWidget):
             df.to_csv(csv_filename, index=False)
             print(f"Coordinates in the new frame: {new_coords}")
 
+    def load_image_at_index(self, index):
+        """Load the image at the specified index and update UI elements."""
+        # Mettre à jour l'index de l'image courante
+        self.current_image_index = index * self.Color_number
+        self.viewer.layers.clear()
+        self.load_image()
+
+        # Mettre à jour l'index dans le champ `image_index`
+        self.image_index.setText(str(index + 1))
+
+        # Mettre à jour la sélection dans le menu déroulant `image_selector`
+        self.image_selector.setCurrentIndex(index)
+
+        # Mettre à jour la barre de progression
+        if hasattr(self, 'total_images') and self.total_images > 0:
+            progress_percentage = int((index / self.total_images) * 100)
+            self.progress_bar.setValue(progress_percentage)
+
+    def on_image_selector_changed(self, index):
+        if index >= 0 and hasattr(self, 'total_images') and 0 <= index < self.total_images:
+            self.load_image_at_index(index)
+
     def on_image_index_changed(self):
         try:
-            new_index = int(self.image_index.text())
-            if 0 < new_index <= self.total_images:
-                self.current_image_index = (new_index - 1) * self.Color_number
-                self.viewer.layers.clear()
-                self.load_image()
-                progress_percentage = int((new_index - 1) / self.total_images * 100)
-                self.progress_bar.setValue(progress_percentage)
+            new_index = int(self.image_index.text()) - 1  # Ajuster pour correspondre à l'indice zéro
+            if hasattr(self, 'total_images') and 0 <= new_index < self.total_images:
+                self.load_image_at_index(new_index)
             else:
-                show_info(f"Please enter a valid index between 1 and {self.total_images}.")
+                show_info(f"Please enter a valid index between 1 and {getattr(self, 'total_images', 'N/A')}.")
         except ValueError:
             show_info("Please enter a valid number for the image index.")
 
     def next_image(self):
-        if self.current_image_index < len(self.image_paths) - 1:
-            self.viewer.layers.clear()
-            self.load_image()
-            self.update_instructions(0)
-            self.image_index.setText(str(self.current_image_index//self.Color_number))
-            # Calculer le pourcentage d'avancement
-            current_group_index = self.current_image_index // self.Color_number  # Calculer le groupe d'images actuel
-            progress_percentage = int(((current_group_index - 1) / self.total_images) * 100)  # Calculer le pourcentage
-            self.progress_bar.setValue(progress_percentage)  # Mettre à jour la barre de progression
+        if self.current_image_index < len(self.image_paths) - self.Color_number:
+            # Calculer l'index de l'image suivante en augmentant le groupe actuel de 1
+            new_index = (self.current_image_index // self.Color_number) + 1
 
+            # Charger l'image suivante et mettre à jour l'interface
+            self.load_image_at_index(new_index)
+            self.update_instructions(0)  # Réinitialiser les instructions
+
+            # Mettre à jour l'affichage de l'index dans image_index
+            self.image_index.setText(str(new_index + 1))
+
+            # Calculer le pourcentage d'avancement et mettre à jour la barre de progression
+            progress_percentage = int((new_index / self.total_images) * 100)
+            self.progress_bar.setValue(progress_percentage)
         else:
-            self.progress_bar.setValue(100)  # Mettre à jour la barre de progression
             show_info("All images have been processed.")
 
     def previous_image(self):
-        if self.current_image_index > self.Color_number:
-            self.current_image_index -= self.Color_number*2
-            self.viewer.layers.clear()
-            self.load_image()
-            self.update_instructions(0)
-            self.image_index.setText(str(self.current_image_index//self.Color_number))
-            # Calculer le pourcentage d'avancement
-            current_group_index = self.current_image_index // self.Color_number  # Calculer le groupe d'images actuel
-            progress_percentage = int(((current_group_index - 1) / self.total_images) * 100)  # Calculer le pourcentage
-            self.progress_bar.setValue(progress_percentage)  # Mettre à jour la barre de progression
+        if self.current_image_index >= self.Color_number:
+            # Calculer l'index de l'image précédente en décrémentant le groupe actuel de 1
+            new_index = (self.current_image_index // self.Color_number) - 1
 
+            # Charger l'image précédente et mettre à jour l'interface
+            self.load_image_at_index(new_index)
+            self.update_instructions(0)  # Réinitialiser les instructions
+
+            # Mettre à jour l'affichage de l'index dans image_index
+            self.image_index.setText(str(new_index + 1))
+
+            # Calculer le pourcentage d'avancement et mettre à jour la barre de progression
+            progress_percentage = int((new_index / self.total_images) * 100)
+            self.progress_bar.setValue(progress_percentage)
         else:
             show_info("You are already at the first image.")
 
