@@ -17,7 +17,7 @@ from qtpy.QtGui import QIcon, QPixmap
 from packaging import version
 
 # Importing functions from _functions.py
-from ._functions import (calcul_repere, ajuster_origine, ajuster_hauteur, transformer_coordonnees,
+from ._functions import (calcul_repere, ajuster_origine, ajuster_hauteur, ajuster_origine_sur_droite_et_distance, transformer_coordonnees,
                          calculer_distance_physique, save_data_to_csv, draw_axes, draw_plane, draw_cone, draw_origin)
 
 
@@ -224,6 +224,12 @@ class StereotypingWidget(QWidget):
         self.show_plane_checkbox = QCheckBox("Show Plane")
         self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
         computation_layout.addWidget(self.show_plane_checkbox)
+
+        self.method_selection = QComboBox()
+        self.method_selection.addItems(
+            ["Constrained by height and apex distance", "Constrained by line through ventral-dorsal midpoint and apex distance"])
+        computation_layout.addWidget(QLabel("Calculation Method:"))
+        computation_layout.addWidget(self.method_selection)
 
         computation_section.setContentLayout(computation_layout)
         layout.addWidget(computation_section)
@@ -449,7 +455,17 @@ class StereotypingWidget(QWidget):
             self.viewer.add_points(self.centre_base, name="Centre Base")
 
             self.nouvelle_origine, hauteur_pixels = ajuster_origine(self.centre_base, sommet, self.v, hauteur_physique, dx, dy, dz)
-            self.nouvelle_origine, self.v, self.w = ajuster_hauteur(self.nouvelle_origine, sommet, self.u, self.v, self.w, points, hauteur_pixels, dx, dy, dz)
+
+            if self.method_selection.currentText() == "Constrained by height and apex distance":
+                # Existing method
+                self.nouvelle_origine, self.v, self.w = ajuster_hauteur(
+                    self.nouvelle_origine, sommet, self.u, self.v, self.w, points, hauteur_pixels, dx, dy, dz
+                )
+            else:
+                self.nouvelle_origine, self.v, self.w, M = ajuster_origine_sur_droite_et_distance(
+                    sommet, points[5], points[6], self.centre_base, self.u, hauteur_pixels
+                )
+                self.viewer.add_points(M, name="Milieu", face_color="blue")
 
             csv_filename = save_data_to_csv(self.image_paths[self.current_image_index-1], (self.nouvelle_origine,
                                                                                          self.u, self.v, self.w))

@@ -4,6 +4,7 @@ import os
 import numpy as np
 from scipy.optimize import fsolve
 import pandas as pd
+from scipy.optimize import minimize
 
 
 def ajustement_moindres_carres_contraint(sommet, points):
@@ -91,6 +92,50 @@ def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points
     nouveau_vecteur_w /= np.linalg.norm(nouveau_vecteur_w)
 
     return nouvelle_origine, nouveau_vecteur_y, nouveau_vecteur_w
+
+
+def ajuster_origine_sur_droite_et_distance(S, P, V, centre_base, u, d):
+    """
+    Directly computes the origin on the line passing through the apex (S) and the midpoint of the dorsal-ventral
+    points projected onto the base plane, ensuring the point is at a fixed distance (d) from the apex.
+
+    Args:
+    - S (array): Apex coordinates.
+    - P (array): Dorsal point coordinates.
+    - V (array): Ventral point coordinates.
+    - centre_base (array): Center of the base of the cone.
+    - u (array): Vector defining the base direction.
+    - d (float): Desired distance from the apex.
+
+    Returns:
+    - O_prime (array): The recalculated origin coordinates.
+    - v (array): Updated vertical direction vector.
+    - w (array): Updated orthogonal vector.
+    """
+    # Project dorsal and ventral points onto the plane
+    P_proj = projection_orthogonale_sur_plan(P, centre_base, u, np.cross(u, S - centre_base))
+    V_proj = projection_orthogonale_sur_plan(V, centre_base, u, np.cross(u, S - centre_base))
+
+    # Compute midpoint of the projected points
+    M_proj = (P_proj + V_proj) / 2
+
+    # Compute the direction vector of the line
+    direction = M_proj - S
+    norm_direction = np.linalg.norm(direction)
+    direction /= norm_direction  # Normalize direction vector
+
+    # Compute the scaling factor t for the desired distance
+    #t = d / norm_direction
+
+    # Compute the new origin
+    O_prime = S + d * direction
+
+    # Update the vertical and orthogonal vectors
+    v = (S - O_prime) / np.linalg.norm(S - O_prime)
+    w = np.cross(u, v)
+    w /= np.linalg.norm(w)
+
+    return O_prime, v, w, M_proj
 
 
 def transformer_coordonnees(point, origine, u, v, w):
