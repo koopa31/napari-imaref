@@ -2,6 +2,7 @@ import csv
 import os
 
 import numpy as np
+from napari.utils.notifications import show_info
 from scipy.optimize import fsolve
 import pandas as pd
 from scipy.optimize import minimize
@@ -14,37 +15,222 @@ def ajustement_moindres_carres_contraint(sommet, points):
     return normal
 
 
-def calcul_repere(points):
-    sommet = points[0]
-    points_plan = points[1:5]
-    point_haut = points[5]
-    point_bas = points[6]
-    point_base = points[7]
+def calculate_apex_dorsal_plane(apex, dorsal, points):
+    """
+    Computation of the plane passing through apex and dorsal points and as close to the other four points as possible.
+    :param apex: the apex point coordinates
+    :param dorsal: the dorsal point coordinates
+    :param points: the coordinates of the points defining the antero-posterior axis
+    :return:
+    """
+    apex_dorsal_direction = dorsal - apex
+    apex_dorsal_direction /= np.linalg.norm(apex_dorsal_direction)
 
-    vecteur_v = ajustement_moindres_carres_contraint(sommet, points_plan)
-    vecteur_v = vecteur_v / np.linalg.norm(vecteur_v)
+    def initial_guess_svd(points, apex):
+        points_centered = points - apex
+        _, _, Vt = np.linalg.svd(points_centered)
+        return Vt[-1]
 
-    distance_au_plan = np.dot(point_base - sommet, vecteur_v)
-    point_sym = point_base - 2 * distance_au_plan * vecteur_v
+    def objective_function(params):
+        """
+        Objective: Minimize the sum of squared distances of the additional points to the plane.
+        """
+        a, b, c = params
+        normal = np.array([a, b, c])
+        normal /= np.linalg.norm(normal)  # Normalize the normal vector
+        d = -np.dot(normal, apex)  # Plane offset to pass through Apex
 
-    centre_base = (point_base + point_sym) / 2
+        # Ensure Apex and Dorsal are in the plane
+        dist_apex = np.dot(apex, normal) + d
+        dist_dorsal = np.dot(dorsal, normal) + d
 
-    vecteur_y = sommet - centre_base
-    vecteur_y = vecteur_y / np.linalg.norm(vecteur_y)
+        # Calculate distances of the other points to the plane
+        distances = np.dot(points, normal) + d
 
-    vecteur_u = point_base - centre_base
-    vecteur_u = vecteur_u / np.linalg.norm(vecteur_u)
+        # Penalize deviations of apex and dorsal from the plane
+        penalty = dist_apex**2 + dist_dorsal**2
+        return np.sum(distances**2) + penalty
 
-    vecteur_w = np.cross(vecteur_u, vecteur_y)
-    vecteur_w = vecteur_w / np.linalg.norm(vecteur_w)
 
-    direction_bas = point_bas - centre_base
-    if np.dot(vecteur_w, direction_bas) < 0:
-        vecteur_w = -vecteur_w
-        vecteur_u = np.cross(vecteur_y, vecteur_w)
-        vecteur_u = vecteur_u / np.linalg.norm(vecteur_u)
+    def apex_dorsal_constraint(params):
+        a, b, c = params
+        normal = np.array([a, b, c])
+        return np.dot(normal, apex_dorsal_direction)  # Should be 0 for orthogonality
 
-    return centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v, point_haut, point_bas
+    initial_guess = initial_guess_svd(points, apex)
+    result = minimize(
+        objective_function,
+        initial_guess,
+        method="SLSQP",
+        constraints=[
+            {"type": "eq", "fun": apex_dorsal_constraint},
+        ],
+        options={"maxiter": 2000},
+    )
+
+    if not result.success:
+        raise ValueError(f"Optimization failed: {result.message}")
+
+    normal = result.x / np.linalg.norm(result.x)
+    d = -np.dot(normal, apex)
+    return np.array([*normal, d])
+
+
+
+def calculate_origin(apex, dorsal, normal, p, d):
+    """
+    Calculate the origin in the plane at a depth `p` from Dorsal
+    and at a distance `d` from Apex.
+
+    Args:
+        apex (np.array): Coordinates of the Apex point (shape (3,)).
+        dorsal (np.array): Coordinates of the Dorsal point (shape (3,)).
+        normal (np.array): Normal vector of the plane (shape (3,)).
+        p (float): Depth from Dorsal in the plane.
+        d (float): Distance from Apex in the plane.
+
+    Returns:
+        np.array: Coordinates of the origin.
+    """
+    # Step 1: Define two vectors in the plane
+    arbitrary_vector = np.array([1, 0, 0])
+    if np.allclose(np.cross(normal, arbitrary_vector), 0):
+        arbitrary_vector = np.array([0, 1, 0])
+
+    v = np.cross(normal, arbitrary_vector)
+    v = v / np.linalg.norm(v)  # Normalize
+    w = np.cross(normal, v)
+    w = w / np.linalg.norm(w)  # Normalize
+
+    # Step 2: Define the function to solve
+    def equations(params):
+        alpha, beta = params
+        # Origin in the plane
+        origin = dorsal + alpha * v + beta * w
+
+        # Constraints: Distance from Apex and depth from Dorsal
+        eq1 = np.linalg.norm(origin - dorsal) - p
+        eq2 = np.linalg.norm(origin - apex) - d
+        return [eq1, eq2]
+
+    # Step 3: Solve the equations
+    initial_guess = [0, 0]
+    alpha_beta = fsolve(equations, initial_guess)
+    alpha, beta = alpha_beta
+
+    # Step 4: Calculate the final origin
+    origin = dorsal + alpha * v + beta * w
+    return origin
+
+
+def project_point_onto_plane(point, plane_point, normal):
+    """
+    Project a point onto a plane.
+
+    Args:
+        point (np.array): Coordinates of the point to project (shape (3,)).
+        plane_point (np.array): A point on the plane (shape (3,)).
+        normal (np.array): Normal vector of the plane (shape (3,)).
+
+    Returns:
+        np.array: Coordinates of the projected point (shape (3,)).
+    """
+    normal = normal / np.linalg.norm(normal)  # Ensure normal is unit length
+    vector_to_plane = point - plane_point  # Vector from plane point to the point
+    distance = np.dot(vector_to_plane, normal)  # Signed distance to the plane
+    projection = point - distance * normal  # Projected point
+    return projection
+
+
+def calculate_frame_on_translated_line(dorsal, dorsal2_projected, apex, distance_apex, normal):
+    """
+    Calculate an orthonormal frame in the translated line passing through Apex.
+
+    Args:
+        dorsal (np.array): Coordinates of the Dorsal point (shape (3,)).
+        dorsal2_projected (np.array): Coordinates of the projected Dorsal2 point (shape (3,)).
+        apex (np.array): Coordinates of the Apex point (shape (3,)).
+        distance_apex (float): Desired distance from Apex to the origin O (in micrometers).
+        normal (np.array): Normal vector of the plane (shape (3,)).
+
+    Returns:
+        tuple: (origin, vector_x, vector_y, vector_z)
+    """
+    # Step 1: Calculate the direction vector of the line
+    direction = dorsal2_projected - dorsal
+    direction /= np.linalg.norm(direction)  # Normalize
+
+    # Step 2: Calculate the origin O on the line
+    t = distance_apex / np.linalg.norm(direction)
+    o1 = apex - t * direction
+    o2 = apex + t * direction
+    distance_o1 = np.linalg.norm(o1 - dorsal)
+    distance_o2 = np.linalg.norm(o2 - dorsal)
+    origin = o1 if distance_o1 < distance_o2 else o2
+
+    # Step 3: Calculate the y-vector (from origin to Apex)
+    vector_y = apex - origin
+    vector_y /= np.linalg.norm(vector_y)  # Normalize
+
+    # Step 4: Calculate the z-vector to ensure it's oriented towards the dorsal plane
+    # Compute a vector in the direction from the origin to dorsal
+    dorsal_direction = dorsal - origin
+    dorsal_direction /= np.linalg.norm(dorsal_direction)
+
+    # Project `dorsal_direction` onto the plane orthogonal to vector_y
+    vector_z = dorsal_direction - np.dot(dorsal_direction, vector_y) * vector_y
+    vector_z /= np.linalg.norm(vector_z)  # Normalize
+
+    # Step 5: Calculate the x-vector using y and z (ensuring orthogonality)
+    vector_x = np.cross(vector_z, vector_y)
+    vector_x /= np.linalg.norm(vector_x)  # Normalize
+
+    return origin, vector_x, vector_y, vector_z
+
+
+
+def calcul_repere(points, profondeur_um, distance_apex_um, dx, dy, dz):
+    """
+    Calculate an orthonormal reference frame in a plane containing Apex and Dorsal.
+    The origin is placed at a given depth from Dorsal and at a given distance from Apex.
+
+    Args:
+        points (np.array): Array of points containing Apex, 4 points for plane fitting, and Dorsal.
+                           Shape: (6, 3), where points[0] is Apex, points[-1] is Dorsal.
+        profondeur_um (float): Depth from Dorsal for the origin (in micrometers).
+        distance_apex_um (float): Distance from Apex for the origin (in micrometers).
+        dx (float): Resolution of voxels in the x-direction (in micrometers/pixel).
+        dy (float): Resolution of voxels in the y-direction (in micrometers/pixel).
+        dz (float): Resolution of voxels in the z-direction (in micrometers/pixel).
+
+    Returns:
+        tuple: (centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v)
+    """
+    # Step 1: Extract points
+    sommet = points[0]  # Apex
+    dorsal = points[-2]  # Dorsal
+    dorsal2 = points[-1]  # Dorsal2 (last point to be projected onto the plane)
+    points_plan = points[1:-2]  # The 4 points defining the plane
+
+    # Step 2: Calculate the plane containing Apex and Dorsal
+    plane_params = calculate_apex_dorsal_plane(sommet, dorsal, points_plan)
+    normal = plane_params[:3]  # Normal vector (a, b, c)
+    normal = normal / np.linalg.norm(normal)  # Normalize
+
+    # Step 3: Project Dorsal2 onto the plane
+    dorsal2_projected = project_point_onto_plane(dorsal2, sommet, normal)
+
+    #Step 4 : Computation of the orthonormal frame on the dorsal-dorsal2 straight line translated to apex
+    # Factor to convert distances to pixel space
+    distance_apex_voxels = distance_apex_um / np.sqrt(dx**2 + dy**2 + dz**2)
+    origin, vector_x, vector_y, vector_z = (
+        calculate_frame_on_translated_line(dorsal, dorsal2_projected, sommet, distance_apex_voxels, normal))
+    print("Distance Apex (µm):", distance_apex_um)
+    print("Distance Apex (pixels):", distance_apex_voxels)
+    calculated_distance_pixels = np.linalg.norm(origin - sommet)
+    print("Calculated distance (pixels):", calculated_distance_pixels)
+
+    return sommet, normal, dorsal2_projected, origin, vector_x, vector_y, vector_z
 
 
 def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz):
@@ -177,7 +363,7 @@ def draw_plane(viewer, sommet, vecteur_v):
     - sommet (np.array): Coordonnées du sommet du cône.
     - vecteur_v (np.array): Vecteur normal au plan.
     """
-    scale_factor = 300  # Facteur d'échelle pour définir la taille du plan
+    scale_factor = 800  # Facteur d'échelle pour définir la taille du plan
     arbitrary_vector = np.array([1, 0, 0])
     if np.allclose(np.cross(arbitrary_vector, vecteur_v), 0):
         arbitrary_vector = np.array([0, 1, 0])

@@ -163,6 +163,10 @@ class StereotypingWidget(QWidget):
         self.hauteur_input = QLineEdit("75")
         resolution_layout.addWidget(self.hauteur_input)
 
+        resolution_layout.addWidget(QLabel("Origin Depth (µm):"))
+        self.origin_depth_input = QLineEdit("20")
+        resolution_layout.addWidget(self.origin_depth_input)
+
         resolution_section.setContentLayout(resolution_layout)
         layout.addWidget(resolution_section)
 
@@ -227,7 +231,7 @@ class StereotypingWidget(QWidget):
 
         self.method_selection = QComboBox()
         self.method_selection.addItems(
-            ["Constrained by height and apex distance", "Constrained by line through ventral-dorsal midpoint and apex distance"])
+            ["Set origin depth", "Set origin depth and distance to apex"])
         computation_layout.addWidget(QLabel("Calculation Method:"))
         computation_layout.addWidget(self.method_selection)
 
@@ -426,9 +430,8 @@ class StereotypingWidget(QWidget):
             "Place the second point to define the plane.",
             "Place the third point to define the plane.",
             "Place the fourth point to define the plane.",
-            "Place the embryo's dorsal point.",
-            "Place the embryo's ventral point.",
-            "Place a point on the base perimeter.",
+            "Place an embryo's dorsal point.",
+            "Place a second embryo's dorsal point.",
             "Click 'Calculate Coordinates' to start the calculations."
         ]
         self.instructions_text.setText(instructions[num_points] if num_points < len(instructions) else "Complete instructions.")
@@ -436,25 +439,60 @@ class StereotypingWidget(QWidget):
     def on_points_update(self, event):
         points_layer = event.source
         num_points = len(points_layer.data)
+
+        # Mise à jour des instructions
         self.update_instructions(num_points)
+
+        # Attribution des couleurs fixes pour les points déjà placés
+        colors = []
+        for i in range(num_points):
+            if i == 0:  # Premier point (apex)
+                colors.append([1, 0, 0, 1])  # Rouge
+            elif 1 <= i <= 3:  # Points du plan
+                colors.append([0, 0, 1, 1])  # Bleu
+            else:  # Points dorsaux
+                colors.append([0, 1, 0, 1])  # Vert
+
+        # Appliquer les couleurs fixes aux points déjà placés
+        points_layer.face_color = np.array(colors)
+
+        # Définir la couleur du prochain point à ajouter
+        if num_points == 0:  # Prochain point : Apex
+            points_layer.current_face_color = [1, 0, 0, 1]  # Rouge
+        elif 1 <= num_points <= 3:  # Prochain point : Plan
+            points_layer.current_face_color = [0, 0, 1, 1]  # Bleu
+        else:  # Prochain point : Dorsaux
+            points_layer.current_face_color = [0, 1, 0, 1]  # Vert
+
 
     #@magicgui(call_button="Calculate Coordinates")
     def calculate_coordinates(self):
         global csv_filename
         points_layer = self.viewer.layers['Points']
         points = points_layer.data
-        if len(points) != 8:
-            show_info("You must place eight points.")
+        if len(points) != 7:
+            show_info("You must place six points.")
         else:
-            self.centre_base, self.u, self.v, self.w, sommet, vecteur_v, point_haut, point_bas = calcul_repere(points)
             dx = float(self.dx_input.text())
             dy = float(self.dy_input.text())
             dz = float(self.dz_input.text())
-            hauteur_physique = float(self.hauteur_input.text())
+            distance_apex = float(self.hauteur_input.text())
+            origin_depth = float(self.origin_depth_input.text())
+            #self.centre_base, self.u, self.v, self.w, sommet, vecteur_v, point_haut, point_bas = calcul_repere(points, origin_depth,distance_apex, dx, dy, dz)
+            sommet, vecteur_v, dorsal2_projected, self.nouvelle_origine, self.u, self.v, self.w = calcul_repere(points, origin_depth, distance_apex, dx, dy, dz)
+            #sommet, vecteur_v, dorsal2_projected = calcul_repere(points, origin_depth, distance_apex, dx, dy, dz)
+            draw_plane(self.viewer, sommet, vecteur_v)
+            self.viewer.add_points(dorsal2_projected, name="Point dorsal projeté", face_color="red")
+            self.viewer.add_shapes(
+                                data=np.array([points[-2], dorsal2_projected]),
+                                shape_type="line",
+                                edge_color="red",
+                                edge_width=2,
+                                name="Dorsal to Projected Line",
+                            )
+            #self.viewer.add_points(self.centre_base, name="Centre Base")
 
-            self.viewer.add_points(self.centre_base, name="Centre Base")
-
-            self.nouvelle_origine, hauteur_pixels = ajuster_origine(self.centre_base, sommet, self.v, hauteur_physique, dx, dy, dz)
+            """self.nouvelle_origine, hauteur_pixels = ajuster_origine(self.centre_base, sommet, self.v, distance_apex, dx, dy, dz)
 
             if self.method_selection.currentText() == "Constrained by height and apex distance":
                 # Existing method
@@ -473,7 +511,8 @@ class StereotypingWidget(QWidget):
             print("Height of the origin in Z: ", self.nouvelle_origine[0])
             print("Distance to apex in µm: ", calculer_distance_physique(self.viewer.layers["Points"].data[0],
                                                                          self.nouvelle_origine,
-                                                                         dx, dy, dz))
+                                                                         dx, dy, dz))"""
+
             if self.show_plane_checkbox.isChecked():
                 draw_plane(self.viewer, sommet, vecteur_v)
             if self.show_cone_checkbox.isChecked():
