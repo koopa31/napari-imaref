@@ -205,26 +205,47 @@ def refine_scale_factor(A, centroid, eigvecs, points):
     print(f"Facteur d'échelle optimisé : {scale_factor}")
     return scale_factor
 
+
 def visualize_ellipsoid(A, centroid, eigvecs, viewer):
-    """Visualisation de l'ellipsoïde dans Napari."""
+    """Visualisation de l'ellipsoïde dans Napari avec rendu lisse."""
     # Calculer le facteur d'échelle optimal
     scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
     eigvals, _ = np.linalg.eigh(A)
     axes_lengths = np.sqrt(1 / eigvals) * scale_factor  # Appliquer le facteur d'échelle
 
-    u = np.linspace(0, 2 * np.pi, 100)
+    # Créer une grille dense pour une meilleure interpolation
+    u = np.linspace(0, 2 * np.pi, 200)  # Augmenter la résolution ici
     v = np.linspace(0, np.pi, 100)
     u, v = np.meshgrid(u, v)
+
+    # Points sur une sphère transformée en ellipsoïde
     x = axes_lengths[0] * np.cos(u) * np.sin(v)
     y = axes_lengths[1] * np.sin(u) * np.sin(v)
     z = axes_lengths[2] * np.cos(v)
 
+    # Appliquer les transformations pour les axes propres
     ellipsoid_points = eigvecs @ np.array([x.ravel(), y.ravel(), z.ravel()])
     x_rot, y_rot, z_rot = ellipsoid_points.reshape(3, x.shape[0], x.shape[1]) + centroid[:, None, None]
 
+    # Conversion en surface
     vertices = np.column_stack((x_rot.ravel(), y_rot.ravel(), z_rot.ravel()))
-    faces = np.array([[i, i + 1, i + 2] for i in range(vertices.shape[0] - 2)])
-    viewer.add_surface((vertices, faces), name="Ellipsoïde")
+    faces = []
+
+    for i in range(u.shape[0] - 1):
+        for j in range(u.shape[1] - 1):
+            p1 = i * u.shape[1] + j
+            p2 = p1 + u.shape[1]
+            p3 = p1 + 1
+            p4 = p2 + 1
+            faces.append([p1, p2, p3])
+            faces.append([p2, p4, p3])
+
+    faces = np.array(faces)
+
+    # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoïde", opacity=0.10, blending="additive",
+                       colormap="blue")
+
 
 def draw_axes(viewer, origine, u, v, w):
     """
