@@ -2,6 +2,7 @@ import numpy as np
 import napari
 from skimage.io import imread
 import argparse
+import matplotlib.pyplot as plt
 
 
 def compute_center_of_mass(points):
@@ -271,14 +272,467 @@ def draw_axes(viewer, origine, u, v, w):
 
     viewer.dims.ndisplay = 3
 
+### SENSITIVITY ANALYSIS ###
+
+
+def compute_orientation_deviation(original_axes, perturbed_axes):
+    """
+    Calcule la déviation angulaire des axes principaux entre la configuration originale et perturbée.
+
+    Args:
+        original_axes (np.ndarray): Matrice (3x3) des vecteurs propres des axes originaux.
+        perturbed_axes_list (list): Liste de matrices (3x3) des vecteurs propres perturbés.
+
+    Returns:
+        np.ndarray: Matrice (Nx3) des déviations angulaires (en degrés) des trois axes.
+    """
+    deviations = []
+    angles = []
+    for i in range(3):  # X, Y, Z
+        dot_product = np.clip(np.dot(original_axes[:, i], perturbed_axes[:, i]), -1.0, 1.0)
+        angle = np.arccos(dot_product) * (180 / np.pi)  # Convertir en degrés
+        angles.append(angle)
+    deviations.append(angles)
+
+    return np.array(deviations)
+
+def plot_orientation_deviation(orientation_deviation):
+    """
+    Affiche un graphe de la déviation angulaire des axes.
+
+    Args:
+        orientation_deviation (np.ndarray): Matrice (Nx3) des déviations angulaires en degrés.
+    """
+    plt.figure(figsize=(10, 5))
+
+    orientation_deviation = np.array(orientation_deviation).squeeze()
+
+    for i, label, color in zip(range(3), ["Axe X", "Axe Y", "Axe Z"], ["red", "blue", "green"]):
+        plt.plot(orientation_deviation[:, i], label=label, color=color)
+
+    plt.xlabel("Simulation")
+    plt.ylabel("Déviation angulaire (degrés)")
+    plt.title("Sensibilité des orientations des axes")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
+import numpy as np
+
+def perturb_points_anisotropic(points, noise_std, voxel_size, isotropic):
+    """
+    Simule l'erreur de positionnement en tenant compte de l'anisotropie de résolution.
+    L'erreur est appliquée directement en unités de voxels.
+
+    Args:
+        points (np.ndarray): Points originaux (N,3) exprimés en voxels.
+        noise_std_voxel (float): Écart-type du bruit en unités de voxels.
+        voxel_size (tuple): Tailles des voxels (dz, dy, dx).
+
+    Returns:
+        np.ndarray: Points perturbés (N,3) en voxels.
+    """
+    if isotropic:
+        # Générer un bruit gaussien isotrope
+        noise = np.random.normal(0, noise_std, points.shape)
+
+        # Appliquer le bruit de manière identique dans toutes les directions
+        perturbed_points = points + noise
+    else:
+        # Normalisation de l'erreur en fonction de la résolution relative des voxels
+        # Plus dz est grand, plus on réduit le bruit en Z en pixels.
+        scaling_factor = np.array(voxel_size) / np.max(voxel_size)
+
+        # Générer un bruit gaussien isotrope en voxels
+        noise_voxels = np.random.normal(0, noise_std, points.shape)
+
+        # Appliquer la correction d'anisotropie
+        noise_voxels *= scaling_factor  # Réduit le bruit en pixels là où la résolution est plus faible
+
+        # Ajouter le bruit en unités de voxels
+        perturbed_points = points + noise_voxels
+
+    return perturbed_points
+
+
+def test_sensitivity(points, n_simulations=50, noise_std=1.0, isotropic=True):
+    """
+    Test de sensibilité au placement des points.
+
+    Args:
+        points (np.ndarray): Points originaux.
+        n_simulations (int): Nombre de simulations avec perturbations.
+        noise_std (float): Écart-type du bruit gaussien ajouté aux points.
+
+    Returns:
+        dict: Résultats des centroïdes, axes principaux et orientations pour chaque simulation.
+    """
+    results = {"centroids": [], "axes_lengths": [], "orientations": [], "angles_deviation": []}
+
+    # Calcul de référence (sans perturbation)
+    center_of_mass = compute_center_of_mass(points)
+    normalized_points, P = normalize_points(points, center_of_mass)
+    K = compute_k_matrix(normalized_points)
+    q = run_douglas_rachford(K)
+    A, b, c = extract_parameters(q)
+    A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+    centroid = calculate_centroid(A, b) - center_of_mass
+    eigvals, eigvecs = np.linalg.eigh(A)
+    axes_lengths = np.sqrt(1 / eigvals)
+
+    for i in range(n_simulations):
+        # Ajouter du bruit gaussien aux points
+        #perturbed_points = points + np.random.normal(0, noise_std, points.shape)
+
+        # Définition des tailles des voxels (exemple : 0.2 µm en XY, 1 µm en Z)
+        voxel_size = (0.5, 0.189, 0.189)  # Mettre tes valeurs réelles ici
+
+        # Génération des points perturbés avec correction d’anisotropie
+        perturbed_points = perturb_points_anisotropic(points, noise_std, voxel_size, isotropic)
+
+        # Pipeline d'ajustement
+        center_of_mass = compute_center_of_mass(perturbed_points)
+        normalized_points, P = normalize_points(perturbed_points, center_of_mass)
+        K = compute_k_matrix(normalized_points)
+        q = run_douglas_rachford(K)
+        A, b, c = extract_parameters(q)
+        A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+        centroid_perturbed = calculate_centroid(A, b) - center_of_mass
+        eigvals_perturbed, eigvecs_perturbed = np.linalg.eigh(A)
+        axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
+
+        # Calculer la déviation angulaire des axes X, Y, Z
+        angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
+
+        # Enregistrer les résultats
+        results["centroids"].append(centroid_perturbed)
+        results["axes_lengths"].append(axes_lengths_perturbed)
+        results["orientations"].append(eigvecs_perturbed)
+        results["angles_deviation"].append(angles_deviation)
+
+    return results
+
+def test_sensitivity_multiple_std(points, std_values, n_simulations=50, isotropic=True):
+    """
+    Teste plusieurs niveaux de bruit et stocke les résultats pour analyse.
+
+    Args:
+        points (np.ndarray): Points d'origine.
+        std_values (list): Liste des écarts-types du bruit.
+        voxel_size (tuple): Taille des voxels en (dx, dy, dz).
+        n_simulations (int): Nombre de simulations par niveau de bruit.
+
+    Returns:
+        dict: Résultats pour chaque niveau de bruit.
+    """
+    results = {std: {"centroids": [], "axes_lengths": [], "orientations": [],
+                     "angles_deviation": []} for std in std_values}
+
+    # Calcul de référence (sans perturbation)
+    center_of_mass = compute_center_of_mass(points)
+    normalized_points, P = normalize_points(points, center_of_mass)
+    K = compute_k_matrix(normalized_points)
+    q = run_douglas_rachford(K)
+    A, b, c = extract_parameters(q)
+    A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+    centroid = calculate_centroid(A, b) - center_of_mass
+    eigvals, eigvecs = np.linalg.eigh(A)
+    axes_lengths = np.sqrt(1 / eigvals)
+
+    for std in std_values:
+        for i in range(n_simulations):
+            # Ajouter du bruit gaussien aux points
+            # perturbed_points = points + np.random.normal(0, noise_std, points.shape)
+
+            # Définition des tailles des voxels (exemple : 0.2 µm en XY, 1 µm en Z)
+            voxel_size = (0.5, 0.189, 0.189)  # Mettre tes valeurs réelles ici
+
+            # Génération des points perturbés avec correction d’anisotropie
+            perturbed_points = perturb_points_anisotropic(points, std, voxel_size, isotropic)
+
+            # Pipeline d'ajustement
+            center_of_mass = compute_center_of_mass(perturbed_points)
+            normalized_points, P = normalize_points(perturbed_points, center_of_mass)
+            K = compute_k_matrix(normalized_points)
+            q = run_douglas_rachford(K)
+            A, b, c = extract_parameters(q)
+            A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+            centroid_perturbed = calculate_centroid(A, b) - center_of_mass
+            eigvals_perturbed, eigvecs_perturbed = np.linalg.eigh(A)
+            axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
+
+            # Calculer la déviation angulaire des axes X, Y, Z
+            angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
+
+            # Stocker les erreurs
+            # Enregistrer les résultats
+            results[std]["centroids"].append(centroid_perturbed)
+            results[std]["axes_lengths"].append(axes_lengths_perturbed)
+            results[std]["orientations"].append(eigvecs_perturbed)
+            results[std]["angles_deviation"].append(angles_deviation)
+
+    return results
+
+
+def plot_results_boxplots(results):
+    """
+    Affiche les résultats sous forme de boxplots pour comparer les différentes valeurs de std.
+
+    Args:
+        results (dict): Résultats des simulations.
+    """
+    std_values = list(results.keys())
+
+    # 📌 Déviation du centroïde
+    centroid_errors = [results[std]["centroid_errors"] for std in std_values]
+
+    plt.figure(figsize=(8, 5))
+    plt.boxplot(centroid_errors, labels=std_values)
+    plt.xlabel("Écart-type du bruit")
+    plt.ylabel("Déviation du centroïde")
+    plt.title("Impact du bruit sur la position du centroïde")
+    plt.grid(True)
+    plt.show()
+
+    # 📌 Déviation des longueurs d'axes
+    fig, ax = plt.subplots(figsize=(8, 5))
+    axes_errors_data = {std: [[results[std]["axes_errors"][sim][i] for sim in range(len(results[std]["axes_errors"]))]
+                              for i in range(3)]
+                        for std in std_values}
+
+    for i, label, color in zip(range(3), ["Axe X", "Axe Y", "Axe Z"], ["red", "blue", "green"]):
+        ax.boxplot([axes_errors_data[std][i] for std in std_values], positions=np.array(std_values) + (i - 1) * 0.1,
+                   widths=0.1, patch_artist=True, boxprops=dict(facecolor=color, alpha=0.5))
+
+    ax.set_xlabel("Écart-type du bruit")
+    ax.set_ylabel("Déviation des longueurs d'axes")
+    ax.set_title("Impact du bruit sur la taille des axes")
+    ax.legend(["X", "Y", "Z"])
+    ax.grid(True)
+    plt.show()
+
+    # 📌 Déviation angulaire des axes
+    fig, ax = plt.subplots(figsize=(8, 5))
+    orientation_errors_data = {std: [[results[std]["orientation_errors"][sim][i] for sim in range(len(results[std]["orientation_errors"]))]
+                                     for i in range(3)]
+                               for std in std_values}
+
+    for i, label, color in zip(range(3), ["Axe X", "Axe Y", "Axe Z"], ["red", "blue", "green"]):
+        ax.boxplot([orientation_errors_data[std][i] for std in std_values], positions=np.array(std_values) + (i - 1) * 0.1,
+                   widths=0.1, patch_artist=True, boxprops=dict(facecolor=color, alpha=0.5))
+
+    ax.set_xlabel("Écart-type du bruit")
+    ax.set_ylabel("Déviation angulaire (°)")
+    ax.set_title("Impact du bruit sur l'orientation des axes")
+    ax.legend(["X", "Y", "Z"])
+    ax.grid(True)
+    plt.show()
+
+
+
+def add_perturbed_centroids_to_napari(viewer, perturbed_centroids):
+    """
+    Ajoute un layer de points dans Napari pour visualiser les centroïdes perturbés.
+
+    Args:
+        viewer (napari.Viewer): Viewer Napari en cours.
+        perturbed_centroids (np.ndarray): Liste des centroïdes perturbés (N,3).
+    """
+    viewer.add_points(
+        perturbed_centroids,
+        name="Centroïdes perturbés",
+        size=5,
+        face_color="blue",
+        opacity=0.6
+    )
+    print(f"✅ {len(perturbed_centroids)} centroïdes perturbés ajoutés dans Napari")
+
+def analyze_results(original_centroid, original_axes, results):
+    """
+    Analyse des résultats de sensibilité.
+
+    Args:
+        original_centroid (np.ndarray): Centroïde d'origine.
+        original_axes (np.ndarray): Longueurs des axes d'origine.
+        results (dict): Résultats des simulations.
+    """
+    perturbed_centroids = np.array(results["centroids"])
+    perturbed_axes = np.array(results["axes_lengths"])
+    perturbed_angles = np.array(results["orientations"])
+
+    # 📏 Calcul des déviations
+    centroid_deviation = np.linalg.norm(perturbed_centroids - original_centroid, axis=1)
+    axes_deviation = np.abs(perturbed_axes - original_axes)
+
+    # 📊 Mesures quantitatives
+    mean_centroid_deviation = np.mean(centroid_deviation)
+    std_centroid_deviation = np.std(centroid_deviation)
+    max_centroid_deviation = np.max(centroid_deviation)
+    min_centroid_deviation = np.min(centroid_deviation)
+
+    print(f"📊 Distance moyenne du centroïde : {mean_centroid_deviation:.4f} ± {std_centroid_deviation:.4f}")
+    print(f"📏 Min: {min_centroid_deviation:.4f}, Max: {max_centroid_deviation:.4f}")
+
+    # 🔵 Graphique 1 : Déplacement des centroïdes avec vecteurs
+    fig = plt.figure(figsize=(12, 5))
+    ax1 = fig.add_subplot(121, projection="3d")
+
+    # Centroïde original
+    ax1.scatter(*original_centroid, color="red", label="Original", s=100)
+
+    # Centroïdes perturbés + Vecteurs de déplacement
+    for i in range(len(perturbed_centroids)):
+        ax1.quiver(*original_centroid,
+                   *(perturbed_centroids[i] - original_centroid),
+                   color="black", alpha=0.5, arrow_length_ratio=0.2)
+
+    distances = np.linalg.norm(perturbed_centroids - original_centroid, axis=1)
+    sc = ax1.scatter(perturbed_centroids[:, 0], perturbed_centroids[:, 1], perturbed_centroids[:, 2],
+                     c=distances, cmap='coolwarm', alpha=0.7, s=10, label="Perturbés")
+
+    fig.colorbar(sc, ax=ax1, label="Distance au centroïde original")
+    ax1.set_title("Déplacement des centroïdes (flèches)")
+    ax1.legend()
+
+    # 🟠 Graphique 2 : Déviation des longueurs des axes
+    ax2 = fig.add_subplot(122)
+    for i, axe in zip(range(3), ["Axe Z", "Axe Y", "Axe X"]):
+        ax2.plot(range(len(axes_deviation)), axes_deviation[:, i], label=axe)
+    ax2.set_title("Déviation des longueurs d'axes")
+    ax2.set_xlabel("Simulation")
+    ax2.set_ylabel("Déviation")
+    ax2.legend()
+    plt.show()
+
+    # 📈 Graphique 3 : Distance du centroïde
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(len(centroid_deviation)), centroid_deviation, marker='o', linestyle='-', color='black')
+    plt.axhline(mean_centroid_deviation, color='red', linestyle="--", label="Moyenne")
+    plt.xlabel("Simulation")
+    plt.ylabel("Distance au centroïde original")
+    plt.title("Évolution du déplacement du centroïde")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # 🟢 Graphique 3 : Déviation angulaire des axes
+    plot_orientation_deviation(results["angles_deviation"])
+
+    # 🟣 Graphique 4 : Histogramme des déplacements
+    plt.figure(figsize=(8, 5))
+    plt.hist(distances, bins=20, color='purple', alpha=0.7, edgecolor='black')
+    plt.xlabel("Distance au centroïde original")
+    plt.ylabel("Nombre d'occurrences")
+    plt.title("Distribution des déplacements du centroïde")
+    plt.grid(True)
+    plt.show()
+
+def analyze_results_multiple_std(original_centroid, original_axes, results):
+    """
+    Analyse et affiche les résultats de sensibilité pour plusieurs valeurs de bruit sous forme de boxplots.
+
+    Args:
+        original_centroid (np.ndarray): Centroïde d'origine.
+        original_axes (np.ndarray): Longueurs des axes d'origine.
+        results (dict): Résultats des simulations pour chaque valeur de bruit.
+    """
+    std_values = list(results.keys())
+
+    # 📌 Déviation du centroïde
+    centroid_errors = [np.linalg.norm(np.array(results[std]["centroids"]) - original_centroid, axis=1) for std in std_values]
+
+    plt.figure(figsize=(8, 5))
+    plt.boxplot(centroid_errors, labels=std_values)
+    plt.xlabel("Écart-type du bruit")
+    plt.ylabel("Déviation du centroïde (voxels)")
+    plt.title("Impact du bruit sur la position du centroïde")
+    plt.grid(True)
+    plt.show()
+
+    # 📌 Déviation des longueurs d'axes (X, Y, Z)
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Noms des axes
+    axis_labels = ["Axe Z", "Axe Y", "Axe X"]
+
+    # Liste de couleurs pour chaque std
+    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+
+    # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
+    x_positions = np.array([1, 2, 3])
+
+    for i, std in enumerate(std_values):
+        # Calcul des déviations des longueurs des axes
+        data = [np.array(results[std]["axes_lengths"])[:, j] - original_axes[j] for j in range(3)]
+
+        # Ajout du boxplot avec un léger décalage horizontal
+        ax.boxplot(data, positions=x_positions + (i - len(std_values) / 2) * 0.1, widths=0.08,
+                   patch_artist=True, boxprops=dict(facecolor=colors[i], alpha=0.7))
+
+    # Mise en forme du graphique
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(axis_labels)
+    ax.set_xlabel("Axes principaux de l'ellipsoïde")
+    ax.set_ylabel("Déviation des longueurs d'axes (voxels)")
+    ax.set_title("Impact du bruit sur la taille des axes")
+
+    # Légende des couleurs (STD values)
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {std_values[i]}") for i in
+               range(len(std_values))]
+    ax.legend(handles=handles, title="Écart-type du bruit")
+
+    ax.grid(True)
+    plt.show()
+
+    # 📌 Déviation angulaire des axes (X, Y, Z)
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Noms des axes
+    axis_labels = ["Axe Z", "Axe Y", "Axe X"]
+
+    # Liste de couleurs pour chaque std
+    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+
+    # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
+    x_positions = np.array([1, 2, 3])
+
+    for i, std in enumerate(std_values):
+        # Assurer que chaque élément est bien de taille (N, 3)
+        data = [np.array(results[std]["angles_deviation"]).squeeze()[:, j] for j in range(3)]
+
+        # Ajout du boxplot avec un léger décalage horizontal
+        ax.boxplot(data, positions=x_positions + (i - len(std_values) / 2) * 0.1, widths=0.08,
+                   patch_artist=True, boxprops=dict(facecolor=colors[i], alpha=0.7))
+
+    # Mise en forme du graphique
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(axis_labels)
+    ax.set_xlabel("Axes principaux de l'ellipsoïde")
+    ax.set_ylabel("Déviation angulaire (°)")
+    ax.set_title("Impact du bruit sur l'orientation des axes")
+
+    # Légende des couleurs (STD values)
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {std_values[i]}") for i in
+               range(len(std_values))]
+    ax.legend(handles=handles, title="Écart-type du bruit")
+
+    ax.grid(True)
+    plt.show()
+
+
+### END OF SENSITIVITY ANALYSIS ###
 
 def main():
     # Ajout de l'option argparse
     parser = argparse.ArgumentParser(description="Visualisation d'une ellipsoïde ajustée sur des points.")
     parser.add_argument("--mode", type=str, choices=["synthetic", "real"], default="real",
                         help="Choisir entre les points synthétiques ('synthetic') ou réels ('real').")
+    parser.add_argument("--multiple_std", "-mstd", type=bool, default=True,
+                        help="Calculer les erreurs avec plusieurs niveaux de bruit ou non")
     args = parser.parse_args()
     mode = args.mode
+    mstd = args.multiple_std
 
     if mode == "synthetic":
 
@@ -371,6 +825,18 @@ def main():
         pt_size = 6
     viewer.add_points(points, name="Points", size=pt_size, face_color="red")
     visualize_ellipsoid(A, centroid, eigvecs, viewer)
+
+    # Test de sensibilité
+    if mstd is False:
+        results = test_sensitivity(points, n_simulations=1000, noise_std=2.0, isotropic=True)
+        # Analyse des résultats
+        analyze_results(centroid, np.sqrt(1 / eigvals), results)
+    else:
+        std_values = [0.1, 0.5, 1.0, 2.0, 5.0]
+        results = test_sensitivity_multiple_std(points, n_simulations=100, std_values=std_values, isotropic=True)
+        # Analyse des résultats
+        analyze_results_multiple_std(centroid, np.sqrt(1 / eigvals), results)
+
 
     # Ajout du point d'origine (centroïde)
     viewer.add_points([centroid], name="Origine", size=5, face_color="blue")
