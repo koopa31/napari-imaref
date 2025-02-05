@@ -277,22 +277,27 @@ def draw_axes(viewer, origine, u, v, w):
 
 def compute_orientation_deviation(original_axes, perturbed_axes):
     """
-    Calcule la déviation angulaire des axes principaux entre la configuration originale et perturbée.
+    Calcule la déviation angulaire des axes principaux entre la configuration originale et perturbée,
+    en s'assurant que les axes gardent une orientation cohérente.
 
     Args:
         original_axes (np.ndarray): Matrice (3x3) des vecteurs propres des axes originaux.
-        perturbed_axes_list (list): Liste de matrices (3x3) des vecteurs propres perturbés.
+        perturbed_axes (np.ndarray): Matrice (3x3) des vecteurs propres des axes perturbés.
 
     Returns:
-        np.ndarray: Matrice (Nx3) des déviations angulaires (en degrés) des trois axes.
+        np.ndarray: Matrice (1x3) des déviations angulaires (en degrés) des trois axes.
     """
     deviations = []
-    angles = []
-    for i in range(3):  # X, Y, Z
+
+    for i in range(3):  # Pour chaque axe (X, Y, Z)
+        # Vérifier si l'axe perturbé est dans la même direction que l'axe original
+        if np.dot(original_axes[:, i], perturbed_axes[:, i]) < 0:
+            perturbed_axes[:, i] *= -1  # Inverser le signe si nécessaire
+
+        # Calcul de l'angle entre les axes
         dot_product = np.clip(np.dot(original_axes[:, i], perturbed_axes[:, i]), -1.0, 1.0)
         angle = np.arccos(dot_product) * (180 / np.pi)  # Convertir en degrés
-        angles.append(angle)
-    deviations.append(angles)
+        deviations.append(angle)
 
     return np.array(deviations)
 
@@ -333,12 +338,46 @@ def perturb_points_anisotropic(points, noise_std, voxel_size, isotropic):
     Returns:
         np.ndarray: Points perturbés (N,3) en voxels.
     """
+    from scipy.stats import truncnorm
     if isotropic:
-        # Générer un bruit gaussien isotrope
-        noise = np.random.normal(0, noise_std, points.shape)
 
-        # Appliquer le bruit de manière identique dans toutes les directions
-        perturbed_points = points + noise
+        """# 3D version
+        n_points = points.shape[0]
+
+        # Générer les rayons avec une loi normale tronquée entre -max_radius et +max_radius
+        std = 1
+        max_radius = noise_std * std
+        r = truncnorm.rvs(-max_radius / std, max_radius / std, loc=0, scale=std, size=n_points)
+
+        # Générer des directions aléatoires uniformes sur la sphère
+        u = np.random.normal(size=(n_points, 3))  # Vecteurs aléatoires
+        u /= np.linalg.norm(u, axis=1, keepdims=True)  # Normalisation (unitaire)
+
+        # Appliquer le déplacement
+        perturbations = u * r[:, np.newaxis]
+
+        # Retourner les points perturbés
+        return points + perturbations"""
+
+        n_points = points.shape[0]
+
+        # Définir le rayon maximal en fonction de noise_std
+        max_radius = noise_std  # Correspond au rayon maximal d'erreur en XY
+
+        # Générer les rayons avec une loi normale tronquée entre -max_radius et +max_radius
+        std = max_radius / 3  # Choix du sigma pour que 99% des erreurs restent dans R
+        r = truncnorm.rvs(-max_radius / std, max_radius / std, loc=0, scale=std, size=n_points)
+
+        # Générer des directions aléatoires uniformes sur un cercle
+        angles = np.random.uniform(0, 2 * np.pi, size=n_points)  # Angle aléatoire
+        dx = r * np.cos(angles)  # Déplacement en X
+        dy = r * np.sin(angles)  # Déplacement en Y
+
+        # Appliquer le déplacement uniquement en XY
+        perturbed_points = points.copy()
+        perturbed_points[:, 1] += dx  # Modifier X
+        perturbed_points[:, 2] += dy  # Modifier Y
+
     else:
         # Normalisation de l'erreur en fonction de la résolution relative des voxels
         # Plus dz est grand, plus on réduit le bruit en Z en pixels.
@@ -413,7 +452,7 @@ def test_sensitivity(points, n_simulations=50, noise_std=1.0, isotropic=True):
 
     return results
 
-def test_sensitivity_multiple_std(points, std_values, n_simulations=50, isotropic=True):
+def test_sensitivity_multiple_std(points, std_values, n_simulations=50, voxel_size = (0.5, 0.455, 0.455), isotropic=True):
     """
     Teste plusieurs niveaux de bruit et stocke les résultats pour analyse.
 
@@ -445,9 +484,6 @@ def test_sensitivity_multiple_std(points, std_values, n_simulations=50, isotropi
             # Ajouter du bruit gaussien aux points
             # perturbed_points = points + np.random.normal(0, noise_std, points.shape)
 
-            # Définition des tailles des voxels (exemple : 0.2 µm en XY, 1 µm en Z)
-            voxel_size = (0.5, 0.189, 0.189)  # Mettre tes valeurs réelles ici
-
             # Génération des points perturbés avec correction d’anisotropie
             perturbed_points = perturb_points_anisotropic(points, std, voxel_size, isotropic)
 
@@ -473,62 +509,6 @@ def test_sensitivity_multiple_std(points, std_values, n_simulations=50, isotropi
             results[std]["angles_deviation"].append(angles_deviation)
 
     return results
-
-
-def plot_results_boxplots(results):
-    """
-    Affiche les résultats sous forme de boxplots pour comparer les différentes valeurs de std.
-
-    Args:
-        results (dict): Résultats des simulations.
-    """
-    std_values = list(results.keys())
-
-    # 📌 Déviation du centroïde
-    centroid_errors = [results[std]["centroid_errors"] for std in std_values]
-
-    plt.figure(figsize=(8, 5))
-    plt.boxplot(centroid_errors, labels=std_values)
-    plt.xlabel("Écart-type du bruit")
-    plt.ylabel("Déviation du centroïde")
-    plt.title("Impact du bruit sur la position du centroïde")
-    plt.grid(True)
-    plt.show()
-
-    # 📌 Déviation des longueurs d'axes
-    fig, ax = plt.subplots(figsize=(8, 5))
-    axes_errors_data = {std: [[results[std]["axes_errors"][sim][i] for sim in range(len(results[std]["axes_errors"]))]
-                              for i in range(3)]
-                        for std in std_values}
-
-    for i, label, color in zip(range(3), ["Axe X", "Axe Y", "Axe Z"], ["red", "blue", "green"]):
-        ax.boxplot([axes_errors_data[std][i] for std in std_values], positions=np.array(std_values) + (i - 1) * 0.1,
-                   widths=0.1, patch_artist=True, boxprops=dict(facecolor=color, alpha=0.5))
-
-    ax.set_xlabel("Écart-type du bruit")
-    ax.set_ylabel("Déviation des longueurs d'axes")
-    ax.set_title("Impact du bruit sur la taille des axes")
-    ax.legend(["X", "Y", "Z"])
-    ax.grid(True)
-    plt.show()
-
-    # 📌 Déviation angulaire des axes
-    fig, ax = plt.subplots(figsize=(8, 5))
-    orientation_errors_data = {std: [[results[std]["orientation_errors"][sim][i] for sim in range(len(results[std]["orientation_errors"]))]
-                                     for i in range(3)]
-                               for std in std_values}
-
-    for i, label, color in zip(range(3), ["Axe X", "Axe Y", "Axe Z"], ["red", "blue", "green"]):
-        ax.boxplot([orientation_errors_data[std][i] for std in std_values], positions=np.array(std_values) + (i - 1) * 0.1,
-                   widths=0.1, patch_artist=True, boxprops=dict(facecolor=color, alpha=0.5))
-
-    ax.set_xlabel("Écart-type du bruit")
-    ax.set_ylabel("Déviation angulaire (°)")
-    ax.set_title("Impact du bruit sur l'orientation des axes")
-    ax.legend(["X", "Y", "Z"])
-    ax.grid(True)
-    plt.show()
-
 
 
 def add_perturbed_centroids_to_napari(viewer, perturbed_centroids):
@@ -628,7 +608,7 @@ def analyze_results(original_centroid, original_axes, results):
     plt.grid(True)
     plt.show()
 
-def analyze_results_multiple_std(original_centroid, original_axes, results):
+def analyze_results_multiple_std(original_centroid, original_axes, results, voxel_size):
     """
     Analyse et affiche les résultats de sensibilité pour plusieurs valeurs de bruit sous forme de boxplots.
 
@@ -639,14 +619,17 @@ def analyze_results_multiple_std(original_centroid, original_axes, results):
     """
     std_values = list(results.keys())
 
-    # 📌 Déviation du centroïde
-    centroid_errors = [np.linalg.norm(np.array(results[std]["centroids"]) - original_centroid, axis=1) for std in std_values]
-
+    # 📌 Déviation du centroïde en µm
+    centroid_errors_um = [
+        np.linalg.norm((np.array(results[std]["centroids"]) - original_centroid) * voxel_size, axis=1)
+        for std in std_values
+    ]
+    µm_std_values = [x * voxel_size[1] for x in std_values]
     plt.figure(figsize=(8, 5))
-    plt.boxplot(centroid_errors, labels=std_values)
-    plt.xlabel("Écart-type du bruit")
-    plt.ylabel("Déviation du centroïde (voxels)")
-    plt.title("Impact du bruit sur la position du centroïde")
+    plt.boxplot(centroid_errors_um, labels=[f"{x:.1f}" for x in µm_std_values])
+    plt.xlabel("Écart-type du bruit (µm)")
+    plt.ylabel("Déviation du centroïde (µm)")
+    plt.title("Impact du bruit sur la position du centroïde en µm")
     plt.grid(True)
     plt.show()
 
@@ -662,25 +645,31 @@ def analyze_results_multiple_std(original_centroid, original_axes, results):
     # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
     x_positions = np.array([1, 2, 3])
 
+    # Convertir les std en µm pour l'affichage
+    µm_std_values = [x * voxel_size[1] for x in std_values]
+
     for i, std in enumerate(std_values):
         # Calcul des déviations des longueurs des axes
-        data = [np.array(results[std]["axes_lengths"])[:, j] - original_axes[j] for j in range(3)]
+        data_um = [
+            (np.array(results[std]["axes_lengths"])[:, j] - original_axes[j]) * voxel_size[j]
+            for j in range(3)
+        ]
 
         # Ajout du boxplot avec un léger décalage horizontal
-        ax.boxplot(data, positions=x_positions + (i - len(std_values) / 2) * 0.1, widths=0.08,
+        ax.boxplot(data_um, positions=x_positions + (i - len(std_values) / 2) * 0.1, widths=0.08,
                    patch_artist=True, boxprops=dict(facecolor=colors[i], alpha=0.7))
 
     # Mise en forme du graphique
     ax.set_xticks(x_positions)
     ax.set_xticklabels(axis_labels)
     ax.set_xlabel("Axes principaux de l'ellipsoïde")
-    ax.set_ylabel("Déviation des longueurs d'axes (voxels)")
-    ax.set_title("Impact du bruit sur la taille des axes")
+    ax.set_ylabel("Déviation des longueurs d'axes (µm)")
+    ax.set_title("Impact du bruit sur la taille des axes en µm")
 
-    # Légende des couleurs (STD values)
-    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {std_values[i]}") for i in
-               range(len(std_values))]
-    ax.legend(handles=handles, title="Écart-type du bruit")
+    # Légende des couleurs (STD values en µm)
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
+               for i in range(len(std_values))]
+    ax.legend(handles=handles, title="Écart-type du bruit (µm)")
 
     ax.grid(True)
     plt.show()
@@ -713,8 +702,8 @@ def analyze_results_multiple_std(original_centroid, original_axes, results):
     ax.set_title("Impact du bruit sur l'orientation des axes")
 
     # Légende des couleurs (STD values)
-    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {std_values[i]}") for i in
-               range(len(std_values))]
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
+               for i in range(len(std_values))]
     ax.legend(handles=handles, title="Écart-type du bruit")
 
     ax.grid(True)
@@ -1138,16 +1127,20 @@ def main():
     viewer.add_points(points, name="Points", size=pt_size, face_color="red")
     visualize_ellipsoid(A, centroid, eigvecs, viewer)
 
+    voxel_size = (0.5, 0.455, 0.455)
     # Test de sensibilité
     if mstd is False:
         results = test_sensitivity(points, n_simulations=1000, noise_std=2.0, isotropic=True)
         # Analyse des résultats
         analyze_results(centroid, np.sqrt(1 / eigvals), results)
     else:
-        std_values = [0.1, 0.5, 1.0, 2.0, 5.0, 8.0]
-        results = test_sensitivity_multiple_std(points, n_simulations=10, std_values=std_values, isotropic=True)
+        dx = 0.455
+        µm_std_values = [0.5, 1.0, 2.0, 3.0, 4.0]
+        std_values = [x / dx for x in µm_std_values]
+        results = test_sensitivity_multiple_std(points, n_simulations=10, std_values=std_values, voxel_size=voxel_size,
+                                                isotropic=True)
         # Analyse des résultats
-        analyze_results_multiple_std(centroid, np.sqrt(1 / eigvals), results)
+        analyze_results_multiple_std(centroid, np.sqrt(1 / eigvals), results, voxel_size)
 
 
     # Ajout du point d'origine (centroïde)
