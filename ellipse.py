@@ -4,6 +4,7 @@ from skimage.io import imread
 import argparse
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from LogitNormal import LogitNormal
 
 
 def compute_center_of_mass(points):
@@ -249,28 +250,29 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
                        colormap="blue")
 
 
-def draw_axes(viewer, origine, u, v, w):
+def draw_axes(viewer, origine, u, v, w, std_label=""):
     """
-    Dessine les 3 axes d'un repère
+    Dessine les 3 axes d'un repère et ajoute un label pour distinguer les niveaux de bruit.
 
     Args:
-    - origine (tuple): Coordonnées de l'origine du nouveau repère (x0, y0, z0).
-    - vecteur_u (tuple): Coordonnées du vecteur unitaire u (ux, uy, uz).
-    - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
-    - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
+      - origine (array-like): Coordonnées de l'origine du repère (x0, y0, z0).
+      - u (array-like): Vecteur unitaire pour l'axe X.
+      - v (array-like): Vecteur unitaire pour l'axe Y.
+      - w (array-like): Vecteur unitaire pour l'axe Z.
+      - std_label (str, optionnel): Chaîne de caractères à ajouter au nom des axes.
     """
-    # Dessine l'axe x
+    # Axe X en bleu
     segment_u = np.array([origine, origine + 10 * u])
-    viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue', name='Axe X')
-
-    # Dessine l'axe y
+    viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue',
+                      name=f'Axe X {std_label}')
+    # Axe Y en rouge
     segment_v = np.array([origine, origine + 10 * v])
-    viewer.add_shapes(segment_v, shape_type='line', edge_width=1, edge_color='red', name='Axe Y')
-
-    # Dessine l'axe z
+    viewer.add_shapes(segment_v, shape_type='line', edge_width=1, edge_color='red',
+                      name=f'Axe Y {std_label}')
+    # Axe Z en vert
     segment_w = np.array([origine, origine + 10 * w])
-    viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green', name='Axe Z')
-
+    viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green',
+                      name=f'Axe Z {std_label}')
     viewer.dims.ndisplay = 3
 
 
@@ -306,12 +308,12 @@ def orienter_axes(eigvecs, PA, PD, origine):
         w = cand2 if d2 > 0 else -cand2
 
     # Déduire u pour obtenir un repère droit
-    u = np.cross(v, w)
+    u = np.cross(w, v)
     u /= np.linalg.norm(u)
     # Recalculer w pour assurer l'orthonormalité
-    w = np.cross(u, v)
+    """w = np.cross(u, v)
     w /= np.linalg.norm(w)
-    v /= np.linalg.norm(v)
+    v /= np.linalg.norm(v)"""
 
     return u, v, w
 
@@ -405,22 +407,46 @@ def perturb_points_anisotropic(points, noise_std, voxel_size, isotropic):
 
         n_points = points.shape[0]
 
-        # Définir le rayon maximal en fonction de noise_std
-        max_radius = noise_std  # Correspond au rayon maximal d'erreur en XY
+        # Définir le rayon maximal L = noise_std
+        L = noise_std
 
-        # Générer les rayons avec une loi normale tronquée entre -max_radius et +max_radius
-        std = max_radius / 3  # Choix du sigma pour que 99% des erreurs restent dans R
-        r = truncnorm.rvs(-max_radius / std, max_radius / std, loc=0, scale=std, size=n_points)
+        # Définir l'écart-type de la normale tronquée
+        ratio_std = 0.2
+        sigma = ratio_std * L  # Ajustez ratio_std selon la pente de décroissance voulue
+
+        # Paramètres pour la loi normale tronquée (mu=0, sigma, intervalle [-L, L])
+        mu = 0
+        a, b = -L / sigma, L / sigma  # bornes en unités de l'écart-type
+
+        # Générer des échantillons r dans [-L, +L]
+        r = truncnorm.rvs(a, b, loc=mu, scale=sigma, size=n_points)
+
+        """
+        # Affichage de l'histogramme de r
+        plt.figure(figsize=(8, 5))
+        plt.hist(r, bins=30, density=True, alpha=0.6, color='gray', edgecolor='black',
+                 label="Histogramme des échantillons")
+
+        # Tracer la densité théorique de la loi normale tronquée
+        x = np.linspace(-L, L, 200)
+        pdf = truncnorm.pdf(x, a, b, loc=mu, scale=sigma)
+        plt.plot(x, pdf, 'b-', label=f"TruncNormal(mu=0, sigma={sigma:.2f}, interval=[-L,L])")
+
+        plt.xlabel("r")
+        plt.ylabel("Densité de probabilité")
+        plt.legend()
+        plt.title(f"Loi normale tronquée dans [-{L:.2f}, +{L:.2f}], sigma={sigma:.2f}")
+        plt.show()"""
 
         # Générer des directions aléatoires uniformes sur un cercle
-        angles = np.random.uniform(0, 2 * np.pi, size=n_points)  # Angle aléatoire
-        dx = r * np.cos(angles)  # Déplacement en X
-        dy = r * np.sin(angles)  # Déplacement en Y
+        angles = np.random.uniform(0, 2 * np.pi, size=n_points)
+        dx = r * np.cos(angles)
+        dy = r * np.sin(angles)
 
         # Appliquer le déplacement uniquement en XY
         perturbed_points = points.copy()
-        perturbed_points[:, 1] += dx  # Modifier X
-        perturbed_points[:, 2] += dy  # Modifier Y
+        perturbed_points[:, 1] += dx
+        perturbed_points[:, 2] += dy
 
     else:
         # Normalisation de l'erreur en fonction de la résolution relative des voxels
@@ -496,7 +522,8 @@ def test_sensitivity(points, n_simulations=50, noise_std=1.0, isotropic=True):
 
     return results
 
-def test_sensitivity_multiple_std(points, std_values, n_simulations=50, voxel_size = (0.5, 0.455, 0.455), isotropic=True):
+def test_sensitivity_multiple_std(points, PA, PD, std_values, n_simulations=50, voxel_size = (0.5, 0.455, 0.455),
+                                  isotropic=True):
     """
     Teste plusieurs niveaux de bruit et stocke les résultats pour analyse.
 
@@ -526,6 +553,8 @@ def test_sensitivity_multiple_std(points, std_values, n_simulations=50, voxel_si
     eigvals = eigvals[order]
     eigvecs = eigvecs[:, order]
 
+    eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs,PA, PD, centroid)
+
     axes_lengths = np.sqrt(1 / eigvals)
 
     for std in std_values:
@@ -550,6 +579,9 @@ def test_sensitivity_multiple_std(points, std_values, n_simulations=50, voxel_si
             eigvals_perturbed = eigvals_perturbed[order]
             eigvecs_perturbed = eigvecs_perturbed[:, order]
 
+            eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(eigvecs_perturbed,
+                                                                                        PA, PD, centroid_perturbed)
+
             axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
 
             # Calculer la déviation angulaire des axes X, Y, Z
@@ -562,7 +594,7 @@ def test_sensitivity_multiple_std(points, std_values, n_simulations=50, voxel_si
             results[std]["orientations"].append(eigvecs_perturbed)
             results[std]["angles_deviation"].append(angles_deviation)
 
-    return results
+    return results, eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2]
 
 
 def add_perturbed_centroids_to_napari(viewer, perturbed_centroids):
@@ -709,7 +741,28 @@ def analyze_results(original_centroid, original_axes, results):
     plt.grid(True)
     plt.show()
 
-def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, results, voxel_size, reference_point):
+
+def inverse_transformer_coordonnees(x_pert, origine, u, v, w):
+    """
+    Transforme les coordonnées x_pert (dans le repère perturbé)
+    vers le repère original, sachant que le repère perturbé
+    est défini par son origine 'origine' et les axes u, v, w.
+
+    Paramètres :
+      - x_pert : coordonnées dans le repère perturbé (vecteur 1D de taille 3)
+      - origine: centroïde du repère perturbé (vecteur 1D de taille 3)
+      - u, v, w : axes (vecteurs 1D de taille 3) du repère perturbé
+
+    Retourne :
+      - x_orig : coordonnées du point dans le repère original.
+    """
+    T = np.column_stack((u, v, w))  # Matrice de passage du repère perturbé vers le repère original
+    x_orig = origine + T @ x_pert
+    return x_orig
+
+
+def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, results, voxel_size, reference_point,
+                                 viewer):
     """
     Analyse et affiche les résultats de sensibilité pour plusieurs valeurs de bruit sous forme de boxplots.
 
@@ -886,6 +939,48 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     plt.tight_layout()
     plt.show()
 
+    # Calculez le nuage des positions du point de référence dans le repère original
+    points_ref_orig = []  # liste qui contiendra les positions ramenées dans le repère original
+
+    # On parcourt tous les niveaux de bruit
+
+    for std in sorted(results.keys()):
+        points_ref_orig = []  # Réinitialiser la liste pour ce niveau de bruit
+        for i in range(len(results[std]["centroids"])):
+            # Récupération du repère perturbé pour cette simulation
+            perturbed_centroid = np.array(results[std]["centroids"][i])
+            perturbed_axes = np.array(results[std]["orientations"][i])
+            # On suppose que les colonnes correspondent aux axes dans l'ordre souhaité
+            perturbed_u = perturbed_axes[:, 0]
+            perturbed_v = perturbed_axes[:, 1]
+            perturbed_w = perturbed_axes[:, 2]
+
+            # Calculer les coordonnées du point de référence dans le repère perturbé
+            # Ici, transformer_coordonnees utilise le repère de base (original_centroid, u, v, w)
+            # qui devrait idéalement renvoyer [0,0,0] si le point était exactement positionné.
+            x_pert = transformer_coordonnees(reference_point, original_centroid, u, v, w)
+
+            # "Projeter" cet écart dans le repère d'origine du pertubé à l'aide de inverse_transformer_coordonnees.
+            x_orig = inverse_transformer_coordonnees(x_pert, perturbed_centroid, perturbed_u, perturbed_v, perturbed_w)
+            points_ref_orig.append(x_orig)
+
+        points_ref_orig = np.array(points_ref_orig)
+        # Créer un layer Napari pour ce niveau de bruit, en affichant les points en jaune
+        viewer.add_points(points_ref_orig,
+                          name=f"Points ref pert STD {std:.2f}",
+                          size=5,
+                          face_color="yellow")
+
+        # Choisir, par exemple, la première simulation pour dessiner les axes représentatifs
+        rep_centroid = np.array(results[std]["centroids"][0])
+        rep_axes = np.array(results[std]["orientations"][0])
+        rep_u = rep_axes[:, 0]
+        rep_v = rep_axes[:, 1]
+        rep_w = rep_axes[:, 2]
+
+        # Appeler draw_axes avec un label indiquant le niveau de bruit
+        draw_axes(viewer, rep_centroid, rep_u, rep_v, rep_w, std_label=f"STD {std:.2f}")
+
 
 ### END OF SENSITIVITY ANALYSIS ###
 
@@ -1057,25 +1152,18 @@ def main():
         analyze_results(centroid, np.sqrt(1 / eigvals), results)
     else:
         dx = 0.455
-        µm_std_values = [0.5, 1.0, 2.0, 3.0]
+        µm_std_values = [0.5, 1.0, 1.5, 2.0]
         std_values = [x / dx for x in µm_std_values]
-        results = test_sensitivity_multiple_std(points, n_simulations=100, std_values=std_values, voxel_size=voxel_size,
-                                                isotropic=True)
+        results, u, v, w = test_sensitivity_multiple_std(points, PA, PD, n_simulations=100, std_values=std_values,
+                                                voxel_size=voxel_size, isotropic=True)
         # Analyse des résultats
         reference_point = np.array([[136., 159.1073856, 128.1624962]])  # Point de référence
-        analyze_results_multiple_std(centroid, eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2], np.sqrt(1 / eigvals),
-                                     results, voxel_size, reference_point)
+        analyze_results_multiple_std(centroid, u, v, w, np.sqrt(1 / eigvals),
+                                     results, voxel_size, reference_point, viewer)
 
 
     # Ajout du point d'origine (centroïde)
     viewer.add_points([centroid], name="Origine", size=5, face_color="blue")
-    #u, v, w = eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2]
-    order = np.argsort(eigvals)  # Bien que eigh renvoie déjà dans l'ordre croissant
-    eigvals = eigvals[order]
-    eigvecs = eigvecs[:, order]
-
-    # On suppose que PA, PD et origine sont définis pour le repère de base
-    u, v, w = orienter_axes(eigvecs, PA, PD, centroid)
     draw_axes(viewer, centroid, u, v, w)
     viewer.add_points(reference_point, name="Réference Point", size=10, face_color="green")
     viewer.dims.ndisplay = 3
