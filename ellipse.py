@@ -781,9 +781,9 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     µm_std_values = [x * voxel_size[1] for x in std_values]
     plt.figure(figsize=(8, 5))
     plt.boxplot(centroid_errors_um, labels=[f"{x:.1f}" for x in µm_std_values])
-    plt.xlabel("Écart-type du bruit (µm)")
-    plt.ylabel("Déviation du centroïde (µm)")
-    plt.title("Impact du bruit sur la position du centroïde en µm")
+    plt.xlabel("Positioning error (µm)")
+    plt.ylabel("Displacement of the origin of the reference frame (µm)")
+    plt.title("Impact of positioning error on origin position (µm)")
     plt.grid(True)
     plt.show()
 
@@ -816,14 +816,14 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     # Mise en forme du graphique
     ax.set_xticks(x_positions)
     ax.set_xticklabels(axis_labels)
-    ax.set_xlabel("Axes principaux de l'ellipsoïde")
-    ax.set_ylabel("Déviation des longueurs d'axes (µm)")
-    ax.set_title("Impact du bruit sur la taille des axes en µm")
+    ax.set_xlabel("Ellipsoid axes")
+    ax.set_ylabel("Axes lenth variation (µm)")
+    ax.set_title("Impact of the positioning error on the axes length (in µm)")
 
     # Légende des couleurs (STD values en µm)
     handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
                for i in range(len(std_values))]
-    ax.legend(handles=handles, title="Écart-type du bruit (µm)")
+    ax.legend(handles=handles, title="Positioning error (µm)")
 
     ax.grid(True)
     plt.show()
@@ -851,14 +851,14 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     # Mise en forme du graphique
     ax.set_xticks(x_positions)
     ax.set_xticklabels(axis_labels)
-    ax.set_xlabel("Axes principaux de l'ellipsoïde")
-    ax.set_ylabel("Déviation angulaire (°)")
-    ax.set_title("Impact du bruit sur l'orientation des axes")
+    ax.set_xlabel("Main axes of the ellipsoid")
+    ax.set_ylabel("Angular deviation (°)")
+    ax.set_title("Impact of the positioning error on axes orientation")
 
     # Légende des couleurs (STD values)
     handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
                for i in range(len(std_values))]
-    ax.legend(handles=handles, title="Écart-type du bruit")
+    ax.legend(handles=handles, title="Positioning error (µm)")
 
     ax.grid(True)
     plt.show()
@@ -871,9 +871,9 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     # 📌 Boxplot des distances du point dans les repères perturbés
     plt.figure(figsize=(8, 5))
     plt.boxplot(distances, tick_labels=[f"{x:.1f}" for x in µm_std_values])
-    plt.xlabel("Écart-type du bruit (µm)")
-    plt.ylabel("Distance du point fixé (µm)")
-    plt.title("Impact du bruit sur la localisation du point dans les repères perturbés")
+    plt.xlabel("Positioning error (µm)")
+    plt.ylabel("Distance from set point (µm)")
+    plt.title("Impact of positioning error on the reference point location in disturbed reference frames")
     plt.grid(True)
     plt.show()
 
@@ -930,7 +930,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
         ax.set_ylim([-global_max_radius, global_max_radius])
         ax.set_zlim([-global_max_radius, global_max_radius])
 
-        ax.set_title(f"STD {µm_std_values[i]:.1f} µm")
+        ax.set_title(f"Positioning error: {µm_std_values[i]:.1f} µm")
         ax.set_xlabel("X (µm)")
         ax.set_ylabel("Y (µm)")
         ax.set_zlabel("Z (µm)")
