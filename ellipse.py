@@ -4,7 +4,6 @@ from skimage.io import imread
 import argparse
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from LogitNormal import LogitNormal
 
 
 def compute_center_of_mass(points):
