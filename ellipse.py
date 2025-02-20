@@ -660,6 +660,48 @@ def compute_point_distances_in_perturbed_references(reference_point, original_ce
 
     return distances_per_std, reference_coords, perturbed_coords_per_std
 
+def compute_point_distances_in_perturbed_references_pts_nbre_xp(reference_point, original_centroid, u, v, w, results, voxel_size):
+    """
+    Calcule la distance du point de référence dans chaque repère perturbé.
+
+    Args:
+        reference_point (np.ndarray): Coordonnées du point fixé (1,3).
+        original_centroid (np.ndarray): Centroïde du repère original.
+        results (dict): Résultats des simulations pour chaque std.
+        voxel_size (tuple): Taille des voxels (dz, dy, dx).
+
+    Returns:
+        list: Liste des distances du point fixé dans chaque repère perturbé.
+    """
+    distances_per_std = []
+    reference_coords = transformer_coordonnees(reference_point, original_centroid, u, v, w)
+    perturbed_coords_per_std = []
+
+    for std in results.keys():
+        distances = []
+        perturbed_coords_list = []
+
+        # On boucle sur les m_simulations
+        for i in range(len(results[std]["centroids"])):
+            for j in range(len(results[std]["centroids"][i])):  # On traite chaque centroid individuellement
+                perturbed_centroid = np.array(results[std]["centroids"][i][j])  # Shape (3,)
+                perturbed_u = np.array(results[std]["orientations"][i][j])[:, 0]
+                perturbed_v = np.array(results[std]["orientations"][i][j])[:, 1]
+                perturbed_w = np.array(results[std]["orientations"][i][j])[:, 2]
+
+                # Correction: traiter chaque centroid individuellement
+                perturbed_coords = transformer_coordonnees(reference_point, perturbed_centroid, perturbed_u, perturbed_v, perturbed_w)
+                perturbed_coords_list.append(perturbed_coords)
+
+                # Calcul de la distance entre les points dans les repères perturbés
+                distance = np.linalg.norm((perturbed_coords - reference_coords) * voxel_size)
+                distances.append(distance)
+
+        distances_per_std.append(distances)
+        perturbed_coords_per_std.append(perturbed_coords_list)
+
+    return distances_per_std, reference_coords, perturbed_coords_per_std
+
 
 def analyze_results(original_centroid, original_axes, results):
     """
@@ -981,6 +1023,216 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
         # Appeler draw_axes avec un label indiquant le niveau de bruit
         draw_axes(viewer, rep_centroid, rep_u, rep_v, rep_w, std_label=f"STD {std:.2f}")
 
+def test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulations=50, m_noise_simulations=50,
+                            voxel_size=(0.5, 0.455, 0.455), isotropic=True):
+    """
+    Teste l'impact combiné du nombre de points et du bruit de positionnement.
+
+    Args:
+        points (np.ndarray): Points d'origine.
+        PA, PD (np.ndarray): Points de référence pour l'orientation.
+        subset_ratios (list): Liste des pourcentages de points utilisés.
+        std_values (list): Liste des niveaux de bruit testés.
+        n_simulations (int): Nombre de répétitions pour le choix des points.
+        m_noise_simulations (int): Nombre de répétitions pour l'ajout de bruit.
+        voxel_size (tuple): Taille des voxels.
+        isotropic (bool): Si True, bruit isotrope.
+
+    Returns:
+        dict: Résultats moyens pour chaque (ratio, std).
+    """
+    subset_results = {
+        ratio: {
+            std: {
+                "centroids": [[] for _ in range(n_simulations)],  # Liste de listes pour séparer les N simulations
+                "axes_lengths": [[] for _ in range(n_simulations)],
+                "angles_deviation": [[] for _ in range(n_simulations)],
+                "orientations": [[] for _ in range(n_simulations)]
+            }
+            for std in std_values
+        }
+        for ratio in subset_ratios
+    }
+
+    full_center_of_mass = compute_center_of_mass(points)
+
+    for ratio in subset_ratios:
+        for std in std_values:
+            for i in range(n_simulations):  # Itération sur les choix de points
+                subset_points = points[np.random.choice(points.shape[0], int(ratio * points.shape[0]), replace=False)]
+
+                # Calcul de référence
+                full_center_of_mass = compute_center_of_mass(subset_points)
+                normalized_points, P = normalize_points(subset_points, full_center_of_mass)
+                K = compute_k_matrix(normalized_points)
+                q = run_douglas_rachford(K)
+                A, b, c = extract_parameters(q)
+                A, b, c = denormalize_parameters(A, b, c, full_center_of_mass, P)
+                centroid_ref = calculate_centroid(A, b) - full_center_of_mass
+                eigvals, eigvecs = np.linalg.eigh(A)
+
+                order = np.argsort(eigvals)
+                eigvals = eigvals[order]
+                eigvecs = eigvecs[:, order]
+
+                eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs, PA, PD, centroid_ref)
+
+                for _ in range(m_noise_simulations):  # Itération sur les perturbations de bruit
+                    perturbed_points = perturb_points_anisotropic(subset_points, std, voxel_size, isotropic)
+
+                    # Pipeline de fit
+                    center_of_mass = compute_center_of_mass(perturbed_points)
+                    normalized_points, P = normalize_points(perturbed_points, center_of_mass)
+                    K = compute_k_matrix(normalized_points)
+                    q = run_douglas_rachford(K)
+                    A, b, c = extract_parameters(q)
+                    A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+                    centroid_perturbed = calculate_centroid(A, b) - full_center_of_mass
+                    eigvals_perturbed, eigvecs_perturbed = np.linalg.eigh(A)
+
+                    order = np.argsort(eigvals_perturbed)
+                    eigvals_perturbed = eigvals_perturbed[order]
+                    eigvecs_perturbed = eigvecs_perturbed[:, order]
+
+                    eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(
+                        eigvecs_perturbed, PA, PD, centroid_perturbed)
+
+                    axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
+                    angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
+
+                    # On ajoute à la liste correspondant à la simulation i
+                    subset_results[ratio][std]["centroids"][i].append(centroid_perturbed)
+                    subset_results[ratio][std]["axes_lengths"][i].append(axes_lengths_perturbed)
+                    subset_results[ratio][std]["angles_deviation"][i].append(angles_deviation)
+                    subset_results[ratio][std]["orientations"][i].append(eigvecs_perturbed)
+
+    return subset_results
+
+def analyze_results_subset(subset_results, original_centroid, original_axes, voxel_size, u, v, w, reference_point,
+                           m_noise_simulations):
+    """
+    Analyse l'impact combiné du nombre de points et du bruit sur la stabilité des résultats.
+
+    Args:
+        subset_results (dict): Résultats de test_sensitivity_subset.
+        original_centroid (np.ndarray): Centroïde d'origine.
+        original_axes (np.ndarray): Longueurs des axes d'origine.
+        voxel_size (tuple): Taille des voxels.
+    """
+    subset_ratios = sorted(subset_results.keys())
+    std_values = sorted(subset_results[subset_ratios[0]].keys())
+
+    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+
+    # 📌 Déviation du centroïde en µm (moyenne des moyennes)
+    plt.figure(figsize=(8, 5))
+    for i, std in enumerate(std_values):
+        centroid_errors_um = [
+            np.mean([  # Moyenne sur N tirages de points
+                np.mean([  # Moyenne sur M bruitages
+                    np.linalg.norm((np.array(centroid) - original_centroid) * voxel_size)
+                    for centroid in subset_results[r][std]["centroids"][i]  # Liste des perturbations M
+                ]) if subset_results[r][std]["centroids"][i] else 0  # Gérer les cas vides
+                for i in range(len(subset_results[r][std]["centroids"]))  # Moyenne sur N choix de points
+            ])
+            for r in subset_ratios
+        ]
+
+        plt.plot([int(r * 89) for r in subset_ratios], centroid_errors_um, marker='o', linestyle='-',
+                 label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+
+    plt.xlabel("Total points used")
+    plt.ylabel("Mean displacement of the origin (µm)")
+    plt.title("Impact of point count and noise on origin displacement")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    # 📌 Déviation angulaire moyenne des axes (Z, Y, X) en fonction du nombre de points
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)  # Trois graphes, même échelle en Y
+
+    axis_labels = ["Axe Z", "Axe Y", "Axe X"]
+
+    # Trouver la plage commune pour l'axe Y
+    all_deviations = []
+
+    for i, std in enumerate(std_values):
+        for axis in range(3):
+            deviations = [
+                np.mean([  # Moyenne sur N tirages de points
+                    np.mean([angles[j][axis] for j in range(len(angles))])  # Moyenne sur M bruitages
+                    for angles in subset_results[r][std]["angles_deviation"]
+                ])
+                for r in subset_ratios
+            ]
+            all_deviations.extend(deviations)
+
+    y_min, y_max = min(all_deviations), max(all_deviations)  # Valeurs min/max pour normalisation
+
+    # 📌 Tracer un graphe par axe
+    for axis, ax in enumerate(axes):
+        for i, std in enumerate(std_values):
+            mean_angular_deviation = [
+                np.mean([  # Moyenne sur N tirages de points
+                    np.mean([angles[j][axis] for j in range(len(angles))])  # Moyenne sur M bruitages
+                    for angles in subset_results[r][std]["angles_deviation"]
+                ])
+                for r in subset_ratios
+            ]
+
+            ax.plot([int(r * 100) for r in subset_ratios], mean_angular_deviation, marker='o', linestyle='-',
+                    label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+
+        ax.set_xlabel("Total points used")
+        ax.set_ylabel("Mean angular deviation (°)")
+        ax.set_title(f"Impact of point count and noise on {axis_labels[axis]}")
+        ax.legend()
+        ax.grid(True)
+        ax.set_ylim(y_min, y_max)  # Assurer une échelle commune en Y
+
+    plt.tight_layout()
+    plt.show()
+
+    for i, std in enumerate(std_values):
+        mean_distances = []
+
+        for r in subset_ratios:
+            distances_for_ratio = []
+
+            # 🔹 Convertir les résultats pour le format attendu
+            std_results = {
+                std: {
+                    "centroids": subset_results[r][std]["centroids"],
+                    "axes_lengths": subset_results[r][std]["axes_lengths"],
+                    "orientations": subset_results[r][std]["orientations"],
+                    "angles_deviation": subset_results[r][std]["angles_deviation"],
+                }
+            }
+
+            for j in range(len(subset_results[r][std]["centroids"])):  # Parcourt les N tirages de points
+                distances, _, _ = compute_point_distances_in_perturbed_references_pts_nbre_xp(
+                    reference_point, original_centroid, u, v, w, std_results, voxel_size
+                )
+
+                # 🔹 Prendre la moyenne sur M tirages de bruit
+                mean_distance_per_noise = [np.mean(dist) for dist in distances[0]]
+
+                # 🔹 Ensuite, stocker la moyenne des M pour cette simulation (N)
+                distances_for_ratio.append(np.mean(mean_distance_per_noise))
+
+            # 🔹 Enfin, moyenne sur les N simulations
+            mean_distances.append(np.mean(distances_for_ratio))
+
+        plt.plot([int(r * 100) for r in subset_ratios], mean_distances, marker='o', linestyle='-',
+                 label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+
+    plt.xlabel("Total points used")
+    plt.ylabel("Mean distance from reference point (µm)")
+    plt.title("Impact of point count and noise on the reference point location")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 
 ### END OF SENSITIVITY ANALYSIS ###
 
@@ -1154,12 +1406,20 @@ def main():
         dx = 0.455
         µm_std_values = [0.5, 1.0, 1.5, 2.0]
         std_values = [x / dx for x in µm_std_values]
-        results, u, v, w = test_sensitivity_multiple_std(points, PA, PD, n_simulations=100, std_values=std_values,
-                                                voxel_size=voxel_size, isotropic=True)
+        results, u, v, w = test_sensitivity_multiple_std(points, PA, PD, n_simulations=5, std_values=std_values,
+                                                         voxel_size=voxel_size, isotropic=True)
         # Analyse des résultats
         reference_point = np.array([[136., 159.1073856, 128.1624962]])  # Point de référence
         analyze_results_multiple_std(centroid, u, v, w, np.sqrt(1 / eigvals),
                                      results, voxel_size, reference_point, viewer)
+
+    subset_ratios = [0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # Pourcentages des points à tester
+    noise_simulations = 1000
+    points_nb_simulations = 1000
+    subset_results = test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulations=points_nb_simulations,
+                                             m_noise_simulations= noise_simulations, voxel_size=voxel_size)
+    analyze_results_subset(subset_results, centroid, np.sqrt(1 / eigvals), voxel_size, u, v, w, reference_point,
+                           m_noise_simulations=noise_simulations)
 
 
     # Ajout du point d'origine (centroïde)
