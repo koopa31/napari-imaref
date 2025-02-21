@@ -8,320 +8,289 @@ import pandas as pd
 from scipy.optimize import minimize
 
 
-def ajustement_moindres_carres_contraint(sommet, points):
-    points_centres = points - sommet
-    U, S, Vt = np.linalg.svd(points_centres)
-    normal = Vt[-1]
-    return normal
+def compute_center_of_mass(points):
+    """Calcul du centre de masse."""
+    center_of_mass = np.mean(points, axis=0)
+    print(f"Centre de masse calculé : {center_of_mass}")
+    return center_of_mass
 
 
-def calculate_apex_dorsal_plane(apex, dorsal, points):
+def normalize_points(points, center_of_mass):
+    """Centre et normalise les points par dimension."""
+    centered_points = points - center_of_mass
+    cov_matrix = np.cov(centered_points.T)
+    eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+    scale_factors = np.sqrt(np.maximum(eigvals, 1e-8))
+    P = eigvecs @ np.diag(1 / scale_factors)
+
+    print(f"Matrice P :\n{P}")
+    print(f"Produit P.T @ P :\n{P.T @ P}")
+
+    normalized_points = (P @ centered_points.T).T
+    print(f"Matrice de covariance : {cov_matrix}")
+    print(f"Valeurs propres (normalisation) : {eigvals}")
+    print(f"Matrice de transformation P :\n{P}")
+    print(f"Points normalisés :\n{normalized_points}")
+    print(f"Étendue des points normalisés : {np.ptp(normalized_points, axis=0)}")
+    return normalized_points, P
+
+
+def compute_k_matrix(points):
+    """Calcul de la matrice K basée sur les points normalisés."""
+    K = np.zeros((10, 10))
+    for p in points:
+        q = np.array([
+            p[0]**2, p[1]**2, p[2]**2,
+            np.sqrt(2) * p[0] * p[1], np.sqrt(2) * p[0] * p[2], np.sqrt(2) * p[1] * p[2],
+            np.sqrt(2) * p[0], np.sqrt(2) * p[1], np.sqrt(2) * p[2], 1.0
+        ])
+        K += np.outer(q, q)
+    print(f"Matrice K :\n{K}")
+    return K
+
+
+def initialize_q0():
+    """Initialisation de q0."""
+    q0 = np.zeros(10)
+    q0[:3] = 1.0 / 3.0
+    q0[9] = -1.0
+    print(f"Initialisation de q0 : {q0}")
+    return q0
+
+
+def run_douglas_rachford(K, gamma=10, max_iter=1000, tol=1e-8):
+    """Optimisation avec Douglas-Rachford."""
+    M = gamma * K + np.eye(10)
+    q = initialize_q0()
+    p = q.copy()
+
+    for iteration in range(max_iter):
+        q = project_to_positive_semi_definite_with_trace(p)
+        update = np.linalg.solve(M, 2 * q - p) - q
+        p += update
+        norm_update = np.linalg.norm(update)
+        if norm_update < tol:
+            print(f"Convergence atteinte à l'itération {iteration}")
+            break
+        print(f"Itération {iteration} - Norme de mise à jour : {norm_update}")
+    print(f"Solution finale q : {q}")
+    return q
+
+
+def project_to_positive_semi_definite_with_trace(p):
+    """Projection sur les matrices semi-définies positives avec contrainte de trace."""
+    # Reconstruire la matrice A à partir de p
+    A = np.array([
+        [p[0], p[3] / np.sqrt(2), p[4] / np.sqrt(2)],
+        [p[3] / np.sqrt(2), p[1], p[5] / np.sqrt(2)],
+        [p[4] / np.sqrt(2), p[5] / np.sqrt(2), p[2]]
+    ])
+
+    # Décomposition propre de A
+    eigvals, eigvecs = np.linalg.eigh(A)
+
+    # Projection des valeurs propres sur les positives
+    eigvals = np.maximum(eigvals, 0)
+
+    print(f"Somme des valeurs propres projetées : {np.sum(eigvals)}")
+
+    # Projection des valeurs propres sur le simplex
+    eigvals = project_onto_simplex(eigvals)
+
+    print(f"Somme des valeurs propres projetées : {np.sum(eigvals)}")
+
+    # Reconstruire la matrice projetée A
+    A_projected = eigvecs @ np.diag(eigvals) @ eigvecs.T
+
+    # Reconstruire le vecteur projeté p
+    projected_p = np.zeros(10)
+    projected_p[0] = A_projected[0, 0]
+    projected_p[1] = A_projected[1, 1]
+    projected_p[2] = A_projected[2, 2]
+    projected_p[3] = np.sqrt(2) * A_projected[0, 1]
+    projected_p[4] = np.sqrt(2) * A_projected[0, 2]
+    projected_p[5] = np.sqrt(2) * A_projected[1, 2]
+    projected_p[6:] = p[6:]
+
+    return projected_p
+
+
+def project_onto_simplex(y):
+    """Projette un vecteur y sur le simplex de somme égale à 1."""
+    m = len(y)
+    sorted_y = np.sort(y)[::-1]  # Tri décroissant
+    tmpsum = 0
+
+    for i in range(m - 1):
+        tmpsum += sorted_y[i]
+        tmax = (tmpsum - 1) / (i + 1)
+        if tmax >= sorted_y[i + 1]:
+            break
+    else:
+        tmax = (tmpsum + sorted_y[-1] - 1) / m
+
+    return np.maximum(y - tmax, 0)
+
+
+def extract_parameters(q):
+    """Extrait A, b, et c à partir de q."""
+    A = np.array([
+        [q[0], q[3] / np.sqrt(2), q[4] / np.sqrt(2)],
+        [q[3] / np.sqrt(2), q[1], q[5] / np.sqrt(2)],
+        [q[4] / np.sqrt(2), q[5] / np.sqrt(2), q[2]]
+    ])
+
+    eigvals, _ = np.linalg.eigh(A)
+    lengths_unnormalized = np.sqrt(1 / eigvals)
+    print(f"Longueurs non normalisées des axes : {lengths_unnormalized}")
+
+    b = np.array([q[6] / np.sqrt(2), q[7] / np.sqrt(2), q[8] / np.sqrt(2)])
+    c = q[9]
+    print(f"Paramètres extraits - Matrice A :\n{A}")
+    print(f"Vecteur b : {b}")
+    print(f"Scalaire c : {c}")
+    return A, b, c
+
+
+def denormalize_parameters(A, b, c, center_of_mass, P):
+    """Dénormalise A, b et c."""
+    A_denorm = P.T @ A @ P
+    b_denorm = P.T @ b - 2 * A_denorm @ center_of_mass
+    c_denorm = c + center_of_mass.T @ A_denorm @ center_of_mass - b.T @ P @ center_of_mass
+
+    eigvals_denorm, eigvecs_denorm = np.linalg.eigh(A_denorm)
+    print(f"Valeurs propres dénormalisées : {eigvals_denorm}")
+    print(f"Longueurs des axes après dénormalisation : {np.sqrt(1 / eigvals_denorm)}")
+
+    print("Matrice A dénormalisée :", A_denorm)
+    print("Vecteur b dénormalisé :", b_denorm)
+    print("Scalaire c dénormalisé :", c_denorm)
+    return A_denorm, b_denorm, c_denorm
+
+
+def calculate_centroid(A, b):
+    """Calcul du centroïde."""
+    centroid = -np.linalg.solve(A, b)
+    print(f"Centroïde calculé : {centroid}")
+    return centroid
+
+
+def refine_scale_factor(A, centroid, eigvecs, points):
     """
-    Computation of the plane passing through apex and dorsal points and as close to the other four points as possible.
-    :param apex: the apex point coordinates
-    :param dorsal: the dorsal point coordinates
-    :param points: the coordinates of the points defining the antero-posterior axis
-    :return:
-    """
-    apex_dorsal_direction = dorsal - apex
-    apex_dorsal_direction /= np.linalg.norm(apex_dorsal_direction)
-
-    def initial_guess_svd(points, apex):
-        points_centered = points - apex
-        _, _, Vt = np.linalg.svd(points_centered)
-        return Vt[-1]
-
-    def objective_function(params):
-        """
-        Objective: Minimize the sum of squared distances of the additional points to the plane.
-        """
-        a, b, c = params
-        normal = np.array([a, b, c])
-        normal /= np.linalg.norm(normal)  # Normalize the normal vector
-        d = -np.dot(normal, apex)  # Plane offset to pass through Apex
-
-        # Ensure Apex and Dorsal are in the plane
-        dist_apex = np.dot(apex, normal) + d
-        dist_dorsal = np.dot(dorsal, normal) + d
-
-        # Calculate distances of the other points to the plane
-        distances = np.dot(points, normal) + d
-
-        # Penalize deviations of apex and dorsal from the plane
-        penalty = dist_apex**2 + dist_dorsal**2
-        return np.sum(distances**2) + penalty
-
-
-    def apex_dorsal_constraint(params):
-        a, b, c = params
-        normal = np.array([a, b, c])
-        return np.dot(normal, apex_dorsal_direction)  # Should be 0 for orthogonality
-
-    initial_guess = initial_guess_svd(points, apex)
-    result = minimize(
-        objective_function,
-        initial_guess,
-        method="SLSQP",
-        constraints=[
-            {"type": "eq", "fun": apex_dorsal_constraint},
-        ],
-        options={"maxiter": 2000},
-    )
-
-    if not result.success:
-        raise ValueError(f"Optimization failed: {result.message}")
-
-    normal = result.x / np.linalg.norm(result.x)
-    d = -np.dot(normal, apex)
-    return np.array([*normal, d])
-
-
-
-def calculate_origin(apex, dorsal, normal, p, d):
-    """
-    Calculate the origin in the plane at a depth `p` from Dorsal
-    and at a distance `d` from Apex.
+    Calcule le facteur d'échelle optimal pour ajuster l'ellipsoïde aux points.
 
     Args:
-        apex (np.array): Coordinates of the Apex point (shape (3,)).
-        dorsal (np.array): Coordinates of the Dorsal point (shape (3,)).
-        normal (np.array): Normal vector of the plane (shape (3,)).
-        p (float): Depth from Dorsal in the plane.
-        d (float): Distance from Apex in the plane.
+    - A: Matrice de l'ellipsoïde.
+    - centroid: Coordonnées du centroïde.
+    - eigvecs: Vecteurs propres de la matrice A.
+    - points: Points d'entrée.
 
     Returns:
-        np.array: Coordinates of the origin.
+    - scale_factor: Facteur d'échelle ajusté.
     """
-    # Step 1: Define two vectors in the plane
-    arbitrary_vector = np.array([1, 0, 0])
-    if np.allclose(np.cross(normal, arbitrary_vector), 0):
-        arbitrary_vector = np.array([0, 1, 0])
+    eigvals, _ = np.linalg.eigh(A)
+    axes_lengths = np.sqrt(1 / eigvals)  # Longueurs initiales des axes
 
-    v = np.cross(normal, arbitrary_vector)
-    v = v / np.linalg.norm(v)  # Normalize
-    w = np.cross(normal, v)
-    w = w / np.linalg.norm(w)  # Normalize
+    # Fonction pour calculer la distance d'un point à l'ellipsoïde
+    def distance_to_ellipsoid_scale(scale):
+        scaled_axes = axes_lengths * scale
+        distances = []
+        for point in points:
+            relative_point = eigvecs.T @ (point - centroid)  # Transformer le point dans le repère principal
+            normalized_point = relative_point / scaled_axes  # Normaliser par les axes
+            distance = np.linalg.norm(normalized_point) - 1  # Distance à la surface de l'ellipsoïde
+            distances.append(distance ** 2)
+        return np.mean(distances)
 
-    # Step 2: Define the function to solve
-    def equations(params):
-        alpha, beta = params
-        # Origin in the plane
-        origin = dorsal + alpha * v + beta * w
-
-        # Constraints: Distance from Apex and depth from Dorsal
-        eq1 = np.linalg.norm(origin - dorsal) - p
-        eq2 = np.linalg.norm(origin - apex) - d
-        return [eq1, eq2]
-
-    # Step 3: Solve the equations
-    initial_guess = [0, 0]
-    alpha_beta = fsolve(equations, initial_guess)
-    alpha, beta = alpha_beta
-
-    # Step 4: Calculate the final origin
-    origin = dorsal + alpha * v + beta * w
-    return origin
+    # Trouver le facteur d'échelle optimal
+    from scipy.optimize import minimize_scalar
+    result = minimize_scalar(distance_to_ellipsoid_scale, bounds=(0.1, 10), method='bounded')
+    scale_factor = result.x
+    print(f"Facteur d'échelle optimisé : {scale_factor}")
+    return scale_factor
 
 
-def project_point_onto_plane(point, plane_point, normal):
+def visualize_ellipsoid(A, centroid, eigvecs, viewer):
+    """Visualisation de l'ellipsoïde dans Napari avec rendu lisse."""
+    # Calculer le facteur d'échelle optimal
+    scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
+    eigvals, _ = np.linalg.eigh(A)
+    axes_lengths = np.sqrt(1 / eigvals) * scale_factor  # Appliquer le facteur d'échelle
+
+    # Créer une grille dense pour une meilleure interpolation
+    u = np.linspace(0, 2 * np.pi, 200)  # Augmenter la résolution ici
+    v = np.linspace(0, np.pi, 100)
+    u, v = np.meshgrid(u, v)
+
+    # Points sur une sphère transformée en ellipsoïde
+    x = axes_lengths[0] * np.cos(u) * np.sin(v)
+    y = axes_lengths[1] * np.sin(u) * np.sin(v)
+    z = axes_lengths[2] * np.cos(v)
+
+    # Appliquer les transformations pour les axes propres
+    ellipsoid_points = eigvecs @ np.array([x.ravel(), y.ravel(), z.ravel()])
+    x_rot, y_rot, z_rot = ellipsoid_points.reshape(3, x.shape[0], x.shape[1]) + centroid[:, None, None]
+
+    # Conversion en surface
+    vertices = np.column_stack((x_rot.ravel(), y_rot.ravel(), z_rot.ravel()))
+    faces = []
+
+    for i in range(u.shape[0] - 1):
+        for j in range(u.shape[1] - 1):
+            p1 = i * u.shape[1] + j
+            p2 = p1 + u.shape[1]
+            p3 = p1 + 1
+            p4 = p2 + 1
+            faces.append([p1, p2, p3])
+            faces.append([p2, p4, p3])
+
+    faces = np.array(faces)
+
+    # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoïde", opacity=0.10, blending="additive",
+                       colormap="blue")
+
+
+def orienter_axes(eigvecs, PA, PD, origine):
     """
-    Project a point onto a plane.
+    Fixe l'orientation de la base {u, v, w} de façon constante.
 
-    Args:
-        point (np.array): Coordinates of the point to project (shape (3,)).
-        plane_point (np.array): A point on the plane (shape (3,)).
-        normal (np.array): Normal vector of the plane (shape (3,)).
+    - eigvecs : matrice 3x3 des vecteurs propres (on suppose qu'après tri, eigvecs[:, 0] correspond au grand axe).
+    - PA      : point antérieur (vaut un vecteur de dimension 3)
+    - PD      : point dorsal (vecteur de dimension 3)
+    - origine : origine du repère (vecteur de dimension 3)
 
-    Returns:
-        np.array: Coordinates of the projected point (shape (3,)).
+    Retourne :
+      u, v, w : repère orthonormé avec v orienté vers PA et w vers PD.
     """
-    normal = normal / np.linalg.norm(normal)  # Ensure normal is unit length
-    vector_to_plane = point - plane_point  # Vector from plane point to the point
-    distance = np.dot(vector_to_plane, normal)  # Signed distance to the plane
-    projection = point - distance * normal  # Projected point
-    return projection
+    PA = np.asarray(PA).ravel()
+    PD = np.asarray(PD).ravel()
+    origine = np.asarray(origine).ravel()
 
+    # v est associé au grand axe (supposé être eigvecs[:,0] après tri)
+    v = eigvecs[:, 0].copy()
+    if np.dot(v, PA - origine) < 0:
+        v = -v
 
-def calculate_frame_on_translated_line(dorsal, dorsal2_projected, apex, distance_apex, normal):
-    """
-    Calculate an orthonormal frame in the translated line passing through Apex.
+    # Parmi les deux autres vecteurs, choisissez celui qui pointe le mieux vers PD
+    cand1 = eigvecs[:, 1].copy()
+    cand2 = eigvecs[:, 2].copy()
+    d1 = np.dot(cand1, PD - origine)
+    d2 = np.dot(cand2, PD - origine)
+    if d1 >= d2:
+        w = cand1 if d1 > 0 else -cand1
+    else:
+        w = cand2 if d2 > 0 else -cand2
 
-    Args:
-        dorsal (np.array): Coordinates of the Dorsal point (shape (3,)).
-        dorsal2_projected (np.array): Coordinates of the projected Dorsal2 point (shape (3,)).
-        apex (np.array): Coordinates of the Apex point (shape (3,)).
-        distance_apex (float): Desired distance from Apex to the origin O (in micrometers).
-        normal (np.array): Normal vector of the plane (shape (3,)).
-
-    Returns:
-        tuple: (origin, vector_x, vector_y, vector_z)
-    """
-    # Step 1: Calculate the direction vector of the line
-    direction = dorsal2_projected - dorsal
-    direction /= np.linalg.norm(direction)  # Normalize
-
-    # Step 2: Calculate the origin O on the line
-    t = distance_apex / np.linalg.norm(direction)
-    o1 = apex - t * direction
-    o2 = apex + t * direction
-    distance_o1 = np.linalg.norm(o1 - dorsal)
-    distance_o2 = np.linalg.norm(o2 - dorsal)
-    origin = o1 if distance_o1 < distance_o2 else o2
-
-    # Step 3: Calculate the y-vector (from origin to Apex)
-    vector_y = apex - origin
-    vector_y /= np.linalg.norm(vector_y)  # Normalize
-
-    # Step 4: Calculate the z-vector to ensure it's oriented towards the dorsal plane
-    # Compute a vector in the direction from the origin to dorsal
-    dorsal_direction = dorsal - origin
-    dorsal_direction /= np.linalg.norm(dorsal_direction)
-
-    # Project `dorsal_direction` onto the plane orthogonal to vector_y
-    vector_z = dorsal_direction - np.dot(dorsal_direction, vector_y) * vector_y
-    vector_z /= np.linalg.norm(vector_z)  # Normalize
-
-    # Step 5: Calculate the x-vector using y and z (ensuring orthogonality)
-    vector_x = np.cross(vector_z, vector_y)
-    vector_x /= np.linalg.norm(vector_x)  # Normalize
-
-    return origin, vector_x, vector_y, vector_z
-
-
-
-def calcul_repere(points, profondeur_um, distance_apex_um, dx, dy, dz):
-    """
-    Calculate an orthonormal reference frame in a plane containing Apex and Dorsal.
-    The origin is placed at a given depth from Dorsal and at a given distance from Apex.
-
-    Args:
-        points (np.array): Array of points containing Apex, 4 points for plane fitting, and Dorsal.
-                           Shape: (6, 3), where points[0] is Apex, points[-1] is Dorsal.
-        profondeur_um (float): Depth from Dorsal for the origin (in micrometers).
-        distance_apex_um (float): Distance from Apex for the origin (in micrometers).
-        dx (float): Resolution of voxels in the x-direction (in micrometers/pixel).
-        dy (float): Resolution of voxels in the y-direction (in micrometers/pixel).
-        dz (float): Resolution of voxels in the z-direction (in micrometers/pixel).
-
-    Returns:
-        tuple: (centre_base, vecteur_u, vecteur_y, vecteur_w, sommet, vecteur_v)
-    """
-    # Step 1: Extract points
-    sommet = points[0]  # Apex
-    dorsal = points[-2]  # Dorsal
-    dorsal2 = points[-1]  # Dorsal2 (last point to be projected onto the plane)
-    points_plan = points[1:-2]  # The 4 points defining the plane
-
-    # Step 2: Calculate the plane containing Apex and Dorsal
-    plane_params = calculate_apex_dorsal_plane(sommet, dorsal, points_plan)
-    normal = plane_params[:3]  # Normal vector (a, b, c)
-    normal = normal / np.linalg.norm(normal)  # Normalize
-
-    # Step 3: Project Dorsal2 onto the plane
-    dorsal2_projected = project_point_onto_plane(dorsal2, sommet, normal)
-
-    #Step 4 : Computation of the orthonormal frame on the dorsal-dorsal2 straight line translated to apex
-    # Factor to convert distances to pixel space
-    distance_apex_voxels = distance_apex_um / np.sqrt(dx**2 + dy**2 + dz**2)
-    origin, vector_x, vector_y, vector_z = (
-        calculate_frame_on_translated_line(dorsal, dorsal2_projected, sommet, distance_apex_voxels, normal))
-    print("Distance Apex (µm):", distance_apex_um)
-    print("Distance Apex (pixels):", distance_apex_voxels)
-    calculated_distance_pixels = np.linalg.norm(origin - sommet)
-    print("Calculated distance (pixels):", calculated_distance_pixels)
-
-    return sommet, normal, dorsal2_projected, origin, vector_x, vector_y, vector_z
-
-
-def ajuster_origine(centre_base, sommet, vecteur_y, hauteur_physique, dx, dy, dz):
-    facteur = np.sqrt((vecteur_y[0] * dx) ** 2 + (vecteur_y[1] * dy) ** 2 + (vecteur_y[2] * dz) ** 2)
-    hauteur_pixels = hauteur_physique / facteur
-    vecteur_y_pixels = vecteur_y * hauteur_pixels / np.linalg.norm(vecteur_y)
-    nouvelle_origine = sommet - vecteur_y_pixels
-    return nouvelle_origine, hauteur_pixels
-
-
-def projection_orthogonale_sur_plan(A, centre_base, v, w):
-    n = np.cross(v, w)
-    AC = A - centre_base
-    projection_AC_sur_n = (np.dot(AC, n) / np.dot(n, n)) * n
-    A_prime = A - projection_AC_sur_n
-    return A_prime
-
-
-def trouver_nouvelle_origine(S, P, vecteur_v, vecteur_w, d, z_mi_hauteur):
-    def equations(vars):
-        alpha, beta = vars
-        O_prime = P + alpha * vecteur_v + beta * vecteur_w
-        eq1 = np.linalg.norm(S - O_prime) - d
-        eq2 = O_prime[0] - z_mi_hauteur
-        return [eq1, eq2]
-
-    alpha_beta_initial_guess = [1, 1]
-    alpha_opt, beta_opt = fsolve(equations, alpha_beta_initial_guess)
-    O_prime_opt = P + alpha_opt * vecteur_v + beta_opt * vecteur_w
-    return O_prime_opt, alpha_opt, beta_opt
-
-
-def ajuster_hauteur(centre_base, sommet, vecteur_u, vecteur_y, vecteur_w, points, hauteur_physique, dx, dy, dz):
-    point_haut_proj = projection_orthogonale_sur_plan(points[5], centre_base, vecteur_y, vecteur_w)
-    point_bas_proj = projection_orthogonale_sur_plan(points[6], centre_base, vecteur_y, vecteur_w)
-    mi_hauteur = (point_haut_proj + point_bas_proj) / 2
-    mi_hauteur_z = int(mi_hauteur[0])
-
-    print("Expected height of the origin in Z:", mi_hauteur_z)
-
-    nouvelle_origine, alpha, beta = trouver_nouvelle_origine(sommet, centre_base, vecteur_y, vecteur_w,
-                                                             hauteur_physique, mi_hauteur_z)
-    nouveau_vecteur_y = (sommet - nouvelle_origine) / np.linalg.norm(sommet - nouvelle_origine)
-    nouveau_vecteur_w = np.cross(vecteur_u, nouveau_vecteur_y)
-    nouveau_vecteur_w /= np.linalg.norm(nouveau_vecteur_w)
-
-    return nouvelle_origine, nouveau_vecteur_y, nouveau_vecteur_w
-
-
-def ajuster_origine_sur_droite_et_distance(S, P, V, centre_base, u, d):
-    """
-    Directly computes the origin on the line passing through the apex (S) and the midpoint of the dorsal-ventral
-    points projected onto the base plane, ensuring the point is at a fixed distance (d) from the apex.
-
-    Args:
-    - S (array): Apex coordinates.
-    - P (array): Dorsal point coordinates.
-    - V (array): Ventral point coordinates.
-    - centre_base (array): Center of the base of the cone.
-    - u (array): Vector defining the base direction.
-    - d (float): Desired distance from the apex.
-
-    Returns:
-    - O_prime (array): The recalculated origin coordinates.
-    - v (array): Updated vertical direction vector.
-    - w (array): Updated orthogonal vector.
-    """
-    # Project dorsal and ventral points onto the plane
-    P_proj = projection_orthogonale_sur_plan(P, centre_base, u, np.cross(u, S - centre_base))
-    V_proj = projection_orthogonale_sur_plan(V, centre_base, u, np.cross(u, S - centre_base))
-
-    # Compute midpoint of the projected points
-    M_proj = (P_proj + V_proj) / 2
-
-    # Compute the direction vector of the line
-    direction = M_proj - S
-    norm_direction = np.linalg.norm(direction)
-    direction /= norm_direction  # Normalize direction vector
-
-    # Compute the scaling factor t for the desired distance
-    #t = d / norm_direction
-
-    # Compute the new origin
-    O_prime = S + d * direction
-
-    # Update the vertical and orthogonal vectors
-    v = (S - O_prime) / np.linalg.norm(S - O_prime)
-    w = np.cross(u, v)
+    # Déduire u pour obtenir un repère droit
+    u = np.cross(w, v)
+    u /= np.linalg.norm(u)
+    # Recalculer w pour assurer l'orthonormalité
+    """w = np.cross(u, v)
     w /= np.linalg.norm(w)
+    v /= np.linalg.norm(v)"""
 
-    return O_prime, v, w, M_proj
+    return u, v, w
 
 
 def transformer_coordonnees(point, origine, u, v, w):
@@ -354,73 +323,6 @@ def save_data_to_csv(image_path, data):
         csv_writer.writerow(['Origine', 'u', 'v', 'w'])
         csv_writer.writerow(data)
     return csv_filename
-
-def draw_plane(viewer, sommet, vecteur_v):
-    """
-    Dessine un plan en utilisant un quadrilatère approximant le plan calculé.
-
-    Args:
-    - sommet (np.array): Coordonnées du sommet du cône.
-    - vecteur_v (np.array): Vecteur normal au plan.
-    """
-    scale_factor = 800  # Facteur d'échelle pour définir la taille du plan
-    arbitrary_vector = np.array([1, 0, 0])
-    if np.allclose(np.cross(arbitrary_vector, vecteur_v), 0):
-        arbitrary_vector = np.array([0, 1, 0])
-
-    in_plane_vector1 = np.cross(vecteur_v, arbitrary_vector)
-    in_plane_vector1 = scale_factor * in_plane_vector1 / np.linalg.norm(in_plane_vector1)
-    in_plane_vector2 = np.cross(vecteur_v, in_plane_vector1)
-    in_plane_vector2 = scale_factor * in_plane_vector2 / np.linalg.norm(in_plane_vector2)
-
-    # Calcul des coins du quadrilatère représentant le plan
-    p1 = sommet + in_plane_vector1 + in_plane_vector2
-    p2 = sommet + in_plane_vector1 - in_plane_vector2
-    p3 = sommet - in_plane_vector1 - in_plane_vector2
-    p4 = sommet - in_plane_vector1 + in_plane_vector2
-
-    # Ajouter le quadrilatère au calque de formes avec remplissage
-    viewer.add_shapes(data=[np.array([p1, p2, p3, p4])],
-                      shape_type='polygon',
-                      edge_width=1,
-                      edge_color='cyan',
-                      face_color='cyan',
-                      opacity=0.3,
-                      name='Plan')
-
-
-# Fonction pour dessiner le cône de révolution
-def draw_cone(viewer, sommet, centre_base, point_base, vecteur_u, vecteur_w):
-    """
-    Dessine une représentation simplifiée du cône de révolution.
-
-    Args:
-    - sommet (array): Coordonnées du sommet du cône.
-    - centre_base (array): Coordonnées du centre de la base du cône.
-    - point_base (array): Coordonnées d'un point sur la base.
-    - vecteur_u (array): Vecteur directeur de la base.
-    - vecteur_w (array): Vecteur perpendiculaire pour former le plan de la base.
-    """
-    # Calcul du rayon de la base à partir du point_base
-    rayon_base = np.linalg.norm(point_base - centre_base)
-
-    # Utilisation d'un nombre réduit de segments pour la base
-    num_segments = 12  # Par exemple, 12 segments
-    angles = np.linspace(0, 2 * np.pi, num_segments, endpoint=False)
-
-    # Points de la base
-    base_points = [centre_base + rayon_base * (np.cos(angle) * vecteur_u + np.sin(angle) * vecteur_w) for angle in
-                   angles]
-    base_points = np.array(base_points)
-
-    # Ajouter le polygone de la base
-    viewer.add_shapes(data=[base_points], shape_type='polygon', edge_width=1, edge_color='yellow', face_color='yellow',
-                      opacity=0.3, name='Base du cône')
-
-    # Ajouter les lignes reliant le sommet à la base
-    for point in base_points:
-        viewer.add_shapes(data=np.array([sommet, point]), shape_type='line', edge_width=1, edge_color='yellow',
-                          name='Arête du cône')
 
 
 # Fonction pour dessiner le repère
@@ -458,3 +360,44 @@ def draw_origin(viewer, origine):
     - origine (tuple): Coordonnées de l'origine du repère (centre de la base du cône).
     """
     viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
+
+
+def visualize_ellipsoid(A, centroid, eigvecs, viewer):
+    """Visualisation de l'ellipsoïde dans Napari avec rendu lisse."""
+    # Calculer le facteur d'échelle optimal
+    scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
+    eigvals, _ = np.linalg.eigh(A)
+    axes_lengths = np.sqrt(1 / eigvals) * scale_factor  # Appliquer le facteur d'échelle
+
+    # Créer une grille dense pour une meilleure interpolation
+    u = np.linspace(0, 2 * np.pi, 200)  # Augmenter la résolution ici
+    v = np.linspace(0, np.pi, 100)
+    u, v = np.meshgrid(u, v)
+
+    # Points sur une sphère transformée en ellipsoïde
+    x = axes_lengths[0] * np.cos(u) * np.sin(v)
+    y = axes_lengths[1] * np.sin(u) * np.sin(v)
+    z = axes_lengths[2] * np.cos(v)
+
+    # Appliquer les transformations pour les axes propres
+    ellipsoid_points = eigvecs @ np.array([x.ravel(), y.ravel(), z.ravel()])
+    x_rot, y_rot, z_rot = ellipsoid_points.reshape(3, x.shape[0], x.shape[1]) + centroid[:, None, None]
+
+    # Conversion en surface
+    vertices = np.column_stack((x_rot.ravel(), y_rot.ravel(), z_rot.ravel()))
+    faces = []
+
+    for i in range(u.shape[0] - 1):
+        for j in range(u.shape[1] - 1):
+            p1 = i * u.shape[1] + j
+            p2 = p1 + u.shape[1]
+            p3 = p1 + 1
+            p4 = p2 + 1
+            faces.append([p1, p2, p3])
+            faces.append([p2, p4, p3])
+
+    faces = np.array(faces)
+
+    # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoïde", opacity=0.10, blending="additive",
+                       colormap="blue")

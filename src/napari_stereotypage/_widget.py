@@ -17,8 +17,9 @@ from qtpy.QtGui import QIcon, QPixmap
 from packaging import version
 
 # Importing functions from _functions.py
-from ._functions import (calcul_repere, ajuster_origine, ajuster_hauteur, ajuster_origine_sur_droite_et_distance, transformer_coordonnees,
-                         calculer_distance_physique, save_data_to_csv, draw_axes, draw_plane, draw_cone, draw_origin)
+from ._functions import (compute_center_of_mass, normalize_points, compute_k_matrix, run_douglas_rachford,
+                         transformer_coordonnees, denormalize_parameters, save_data_to_csv, draw_axes, draw_origin,
+                         extract_parameters, calculate_centroid, orienter_axes, visualize_ellipsoid)
 
 
 def check_for_update(plugin_name="napari-stereotypage", viewer=None):
@@ -92,25 +93,28 @@ class CollapsibleGroupBox(QGroupBox):
         self.toggle_button = QPushButton(title)
         self.toggle_button.setToolTip("Click to show or hide additional options.")
         self.toggle_button.setCheckable(True)
-        self.toggle_button.setChecked(False)
+        self.toggle_button.setChecked(True)  # ✅ Ouvrir par défaut
         self.toggle_button.setFixedSize(20, 25)
         self.toggle_button.setStyleSheet("QPushButton { border: none; }")
-        self.update_arrow()
         self.toggle_button.clicked.connect(self.toggle)
 
-        # Ajouter le bouton flèche au titre du QGroupBox
+        # Layout du titre
         title_layout = QHBoxLayout()
         title_layout.addWidget(self.toggle_button)
         title_layout.addStretch()
         title_layout.setContentsMargins(0, 0, 0, 0)
+
         self.setLayout(QVBoxLayout())
         self.layout().addLayout(title_layout)
 
-        # Créer la zone de contenu pour le QGroupBox
+        # Zone de contenu
         self.content_area = QWidget()
-        self.content_area.setMaximumHeight(0)
         self.content_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout().addWidget(self.content_area)
+
+        # ✅ Dérouler par défaut
+        self.content_area.setMaximumHeight(16777215)
+        self.update_arrow()  # Mettre la flèche à jour
 
     def toggle(self):
         # Bascule entre déplié et replié
@@ -143,7 +147,7 @@ class StereotypingWidget(QWidget):
     def initUI(self):
         layout = QVBoxLayout(self)
 
-        # Section déroulante pour les réglages de résolution
+        """# Section déroulante pour les réglages de résolution
         resolution_section = CollapsibleGroupBox("Resolution Settings")
         resolution_layout = QVBoxLayout()
 
@@ -159,16 +163,8 @@ class StereotypingWidget(QWidget):
         self.dz_input = QLineEdit("0.5")
         resolution_layout.addWidget(self.dz_input)
 
-        resolution_layout.addWidget(QLabel("Cone Height (µm):"))
-        self.hauteur_input = QLineEdit("75")
-        resolution_layout.addWidget(self.hauteur_input)
-
-        resolution_layout.addWidget(QLabel("Origin Depth (µm):"))
-        self.origin_depth_input = QLineEdit("20")
-        resolution_layout.addWidget(self.origin_depth_input)
-
         resolution_section.setContentLayout(resolution_layout)
-        layout.addWidget(resolution_section)
+        layout.addWidget(resolution_section)"""
 
         # Section déroulante pour la sélection d'images
         image_selection_section = CollapsibleGroupBox("Image Selection")
@@ -217,23 +213,13 @@ class StereotypingWidget(QWidget):
         calculer_coords_button.clicked.connect(self.calculate_new_coordinates)
         computation_layout.addWidget(calculer_coords_button)
 
-        self.show_axes_checkbox = QCheckBox("Show Axes")
+        self.show_axes_checkbox = QCheckBox("Show computed orthonormal axes")
         self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
         computation_layout.addWidget(self.show_axes_checkbox)
 
-        self.show_cone_checkbox = QCheckBox("Show Cone")
-        self.show_cone_checkbox.setToolTip("Show the cone containing the orthonormal frame")
-        computation_layout.addWidget(self.show_cone_checkbox)
-
-        self.show_plane_checkbox = QCheckBox("Show Plane")
-        self.show_plane_checkbox.setToolTip("Show the embryo symmetry plane")
-        computation_layout.addWidget(self.show_plane_checkbox)
-
-        self.method_selection = QComboBox()
-        self.method_selection.addItems(
-            ["Set origin depth", "Set origin depth and distance to apex"])
-        computation_layout.addWidget(QLabel("Calculation Method:"))
-        computation_layout.addWidget(self.method_selection)
+        self.show_ellipsoid_checkbox = QCheckBox("Show the computed ellipsoid")
+        self.show_ellipsoid_checkbox.setToolTip("Show a transparent fitted ellipsoid")
+        computation_layout.addWidget(self.show_ellipsoid_checkbox)
 
         computation_section.setContentLayout(computation_layout)
         layout.addWidget(computation_section)
@@ -425,13 +411,15 @@ class StereotypingWidget(QWidget):
 
     def update_instructions(self, num_points):
         instructions = [
-            "Place the cone's apex.",
-            "Place the first point to define the plane.",
-            "Place the second point to define the plane.",
-            "Place the third point to define the plane.",
-            "Place the fourth point to define the plane.",
+            "Place the apex (anterior part pf the embryo)",
             "Place an embryo's dorsal point.",
-            "Place a second embryo's dorsal point.",
+            "Place at least 7 more points to fit the ellipsoid.",
+            "Place at least 6 more points to fit the ellipsoid.",
+            "Place at least 5 more points to fit the ellipsoid.",
+            "Place at least 4 more points to fit the ellipsoid.",
+            "Place at least 3 more points to fit the ellipsoid.",
+            "Place at least 2 more points to fit the ellipsoid.",
+            "Place at least 1 more points to fit the ellipsoid.",
             "Click 'Calculate Coordinates' to start the calculations."
         ]
         self.instructions_text.setText(instructions[num_points] if num_points < len(instructions) else "Complete instructions.")
@@ -448,10 +436,10 @@ class StereotypingWidget(QWidget):
         for i in range(num_points):
             if i == 0:  # Premier point (apex)
                 colors.append([1, 0, 0, 1])  # Rouge
-            elif 1 <= i <= 3:  # Points du plan
-                colors.append([0, 0, 1, 1])  # Bleu
-            else:  # Points dorsaux
+            elif i == 1:  # Points du plan
                 colors.append([0, 1, 0, 1])  # Vert
+            else:  # Points dorsaux
+                colors.append([0, 0, 1, 1])  # Bleu
 
         # Appliquer les couleurs fixes aux points déjà placés
         points_layer.face_color = np.array(colors)
@@ -459,67 +447,73 @@ class StereotypingWidget(QWidget):
         # Définir la couleur du prochain point à ajouter
         if num_points == 0:  # Prochain point : Apex
             points_layer.current_face_color = [1, 0, 0, 1]  # Rouge
-        elif 1 <= num_points <= 3:  # Prochain point : Plan
-            points_layer.current_face_color = [0, 0, 1, 1]  # Bleu
-        else:  # Prochain point : Dorsaux
+        elif num_points == 1:  # Prochain point : Plan
             points_layer.current_face_color = [0, 1, 0, 1]  # Vert
+        else:  # Prochain point : Dorsaux
+            points_layer.current_face_color = [0, 0, 1, 1]  # Bleu
 
 
-    #@magicgui(call_button="Calculate Coordinates")
+    # @magicgui(call_button="Calculate Coordinates")
     def calculate_coordinates(self):
         global csv_filename
         points_layer = self.viewer.layers['Points']
         points = points_layer.data
-        if len(points) != 7:
-            show_info("You must place six points.")
+        if len(points) < 9:
+            show_info("You must place at least 9 points.")
         else:
-            dx = float(self.dx_input.text())
+            """dx = float(self.dx_input.text())
             dy = float(self.dy_input.text())
-            dz = float(self.dz_input.text())
-            distance_apex = float(self.hauteur_input.text())
-            origin_depth = float(self.origin_depth_input.text())
-            #self.centre_base, self.u, self.v, self.w, sommet, vecteur_v, point_haut, point_bas = calcul_repere(points, origin_depth,distance_apex, dx, dy, dz)
-            sommet, vecteur_v, dorsal2_projected, self.nouvelle_origine, self.u, self.v, self.w = calcul_repere(points, origin_depth, distance_apex, dx, dy, dz)
-            #sommet, vecteur_v, dorsal2_projected = calcul_repere(points, origin_depth, distance_apex, dx, dy, dz)
-            draw_plane(self.viewer, sommet, vecteur_v)
-            self.viewer.add_points(dorsal2_projected, name="Point dorsal projeté", face_color="red")
-            self.viewer.add_shapes(
-                                data=np.array([points[-2], dorsal2_projected]),
-                                shape_type="line",
-                                edge_color="red",
-                                edge_width=2,
-                                name="Dorsal to Projected Line",
-                            )
-            #self.viewer.add_points(self.centre_base, name="Centre Base")
+            dz = float(self.dz_input.text())"""
+            # Select two reference points from the dataset.
+            PA = points[0, :] # First point in the dataset (used for orientation reference)
+            PD = points[1, :] # Second point in the dataset (used for orientation reference)
 
-            """self.nouvelle_origine, hauteur_pixels = ajuster_origine(self.centre_base, sommet, self.v, distance_apex, dx, dy, dz)
+            # Compute the center of mass of the given points.
+            center_of_mass = compute_center_of_mass(points)
 
-            if self.method_selection.currentText() == "Constrained by height and apex distance":
-                # Existing method
-                self.nouvelle_origine, self.v, self.w = ajuster_hauteur(
-                    self.nouvelle_origine, sommet, self.u, self.v, self.w, points, hauteur_pixels, dx, dy, dz
-                )
-            else:
-                self.nouvelle_origine, self.v, self.w, M = ajuster_origine_sur_droite_et_distance(
-                    sommet, points[5], points[6], self.centre_base, self.u, hauteur_pixels
-                )
-                self.viewer.add_points(M, name="Milieu", face_color="blue")
+            # Normalize the points by translating them to the center of mass.
+            normalized_points, P = normalize_points(points, center_of_mass)
 
-            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index-1], (self.nouvelle_origine,
-                                                                                         self.u, self.v, self.w))
-            self.update_instructions(8)
-            print("Height of the origin in Z: ", self.nouvelle_origine[0])
-            print("Distance to apex in µm: ", calculer_distance_physique(self.viewer.layers["Points"].data[0],
-                                                                         self.nouvelle_origine,
-                                                                         dx, dy, dz))"""
+            # Compute the K matrix, which is used for ellipsoid fitting.
+            K = compute_k_matrix(normalized_points)
 
-            if self.show_plane_checkbox.isChecked():
-                draw_plane(self.viewer, sommet, vecteur_v)
-            if self.show_cone_checkbox.isChecked():
-                draw_cone(self.viewer, sommet, self.nouvelle_origine, points[5], self.u, self.w)
+            # Apply the Douglas-Rachford algorithm to optimize the ellipsoid parameters.
+            q = run_douglas_rachford(K)
+
+            # Extract the quadratic form parameters (A, b, c) that define the ellipsoid.
+            A, b, c = extract_parameters(q)
+
+            # Transform the parameters back to the original coordinate system (denormalization).
+            A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+
+            # Compute the centroid (geometric center) of the fitted ellipsoid.
+            self.nouvelle_origine = calculate_centroid(A, b) - center_of_mass
+
+            # Compute the eigenvalues and eigenvectors of matrix A (which represents the ellipsoid's shape).
+            eigvals, eigvecs = np.linalg.eigh(A)
+
+            # Sort the eigenvalues (smallest to largest) and rearrange eigenvectors accordingly.
+            order = np.argsort(eigvals)
+            eigvecs = eigvecs[:, order]
+
+            # Orient the principal axes (u, v, w) based on the reference points (PA, PD) and the new centroid.
+            reoriented_eigvecs = eigvecs.copy()
+            reoriented_eigvecs[:, 0], reoriented_eigvecs[:, 1], reoriented_eigvecs[:, 2] = orienter_axes(eigvecs, PA,
+                                                                                                         PD, self.nouvelle_origine)
+            self.u, self.v, self.w = (reoriented_eigvecs[:, 0].copy(), reoriented_eigvecs[:, 1].copy(),
+                                      reoriented_eigvecs[:, 2].copy())
+
+            # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
+            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index - 1], (self.nouvelle_origine,
+                                                                                             self.u, self.v,
+                                                                                             self.w))
+            self.update_instructions(10)
+
             if self.show_axes_checkbox.isChecked():
                 draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
                 draw_origin(self.viewer, self.nouvelle_origine)
+            if self.show_ellipsoid_checkbox.isChecked():
+                visualize_ellipsoid(A, self.nouvelle_origine, eigvecs, self.viewer)
             else:
                 self.next_image()
 
