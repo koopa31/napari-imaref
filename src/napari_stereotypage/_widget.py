@@ -2,7 +2,6 @@ from napari import Viewer
 from qtpy.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QCheckBox, QHBoxLayout, QFileDialog,
                             QFrame, QProgressBar, QGroupBox, QSizePolicy)
 from qtpy.QtCore import Qt
-from magicgui import magicgui
 from napari.utils.notifications import show_info
 import numpy as np
 import os
@@ -15,6 +14,7 @@ import sys
 from qtpy.QtWidgets import QMessageBox, QComboBox
 from qtpy.QtGui import QIcon, QPixmap
 from packaging import version
+from qtpy.QtCore import QTimer
 
 # Importing functions from _functions.py
 from ._functions import (compute_center_of_mass, normalize_points, compute_k_matrix, run_douglas_rachford,
@@ -519,24 +519,34 @@ class StereotypingWidget(QWidget):
 
 
     def calculate_new_coordinates(self):
-        if "Plan" in self.viewer.layers:
-            self.viewer.layers.remove("Plan")
+        """if "Plan" in self.viewer.layers:
+            self.viewer.layers.remove("Plan")"""
         self.viewer.dims.ndisplay = 2
         show_info("Place a point to calculate its coordinates in the new frame.")
-        points_layer = self.viewer.layers['Points']
+        self.viewer.add_points(ndim=3, name='Points to evaluate')
+        points_layer = self.viewer.layers['Points to evaluate']
         points_layer.mode = 'add'
         self.viewer.layers.selection.active = points_layer
-        points_layer.events.data.connect(self.on_new_point_added)
+        # ✅ Attendre un peu avant de lier l'événement pour éviter les conflits
+        QTimer.singleShot(10, lambda: points_layer.events.data.connect(self.on_new_point_added))
 
     def on_new_point_added(self, event):
+        """ Cette fonction est appelée après qu'un point a été ajouté. """
         points_layer = event.source
-        if len(points_layer.data) > 8:
+
+        # ✅ Exécuter après un court délai pour éviter le bug "generator already executing"
+        QTimer.singleShot(10, lambda: self.process_new_point(points_layer))
+
+    def process_new_point(self, points_layer):
+        """ Traitement du point après un court délai pour éviter les conflits avec Napari. """
+        if len(points_layer.data) > 0:
             new_point = points_layer.data[-1]
             new_coords = transformer_coordonnees(new_point, self.nouvelle_origine, self.u, self.v, self.w)
 
             df = pd.read_csv(csv_filename)
-            df[f"Point {len(points_layer.data) - 8} Coordinates"] = [new_coords]
+            df[f"Point {len(points_layer.data)} Coordinates"] = [new_coords]
             df.to_csv(csv_filename, index=False)
+
             print(f"Coordinates in the new frame: {new_coords}")
 
     def update_ui_for_image_change(self, index):
