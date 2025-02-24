@@ -1,4 +1,4 @@
-# napari_stereotypage
+# napari_stereotypage <img src="https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="150">
 
 [![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
@@ -7,7 +7,8 @@
 [![codecov](https://codecov.io/gh/koopa31/napari_stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari_stereotypage)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari_stereotypage)](https://napari-hub.org/plugins/napari_stereotypage)
 
-Stereotyping zebrafish embryos by manually setting a reference frame.
+Stereotyping 3D images of the zebrafish olfactory system by defining a reproducible reference frame. 
+The method relies on ellipsoid fitting based on manually placed landmark points.
 
 ----------------------------------
 
