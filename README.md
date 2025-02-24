@@ -1,4 +1,4 @@
-# napari_stereotypage <img src="https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="150">
+# napari_stereotypage <img src="https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="200">
 
 [![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
