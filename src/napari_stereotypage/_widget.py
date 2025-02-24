@@ -304,6 +304,23 @@ class StereotypingWidget(QWidget):
         open_doc_button.clicked.connect(self.open_doc)
         layout.addWidget(open_doc_button)
 
+        # Set logo if internet connexion works
+        try:
+            logo_url = "https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png"
+            response = requests.get(logo_url)
+            if response.status_code == 200:
+                pixmap = QPixmap()
+                pixmap.loadFromData(response.content)
+                pixmap = pixmap.scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                logo_label = QLabel()
+                logo_label.setPixmap(pixmap)
+                logo_label.setAlignment(Qt.AlignCenter)
+                layout.addWidget(logo_label)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to load logo: {e}")
+            pass
+
+
         # Set the layout
         self.setLayout(layout)
         self.update_instructions(0)
