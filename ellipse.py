@@ -4,6 +4,7 @@ from skimage.io import imread
 import argparse
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from joblib import Parallel, delayed
 
 
 def compute_center_of_mass(points):
@@ -835,7 +836,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     axis_labels = ["Axe Z", "Axe Y", "Axe X"]
 
     # Liste de couleurs pour chaque std
-    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+    colors = plt.cm.plasma(np.linspace(0, 1, len(std_values)))
 
     # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
     x_positions = np.array([1, 2, 3])
@@ -858,11 +859,11 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     ax.set_xticks(x_positions)
     ax.set_xticklabels(axis_labels)
     ax.set_xlabel("Ellipsoid axes")
-    ax.set_ylabel("Axes lenth variation (µm)")
+    ax.set_ylabel("Axes length variation (µm)")
     ax.set_title("Impact of the positioning error on the axes length (in µm)")
 
     # Légende des couleurs (STD values en µm)
-    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"{µm_std_values[i]:.1f} µm")
                for i in range(len(std_values))]
     ax.legend(handles=handles, title="Positioning error (µm)")
 
@@ -876,7 +877,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     axis_labels = ["Axe Z", "Axe Y", "Axe X"]
 
     # Liste de couleurs pour chaque std
-    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+    colors = plt.cm.plasma(np.linspace(0, 1, len(std_values)))
 
     # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
     x_positions = np.array([1, 2, 3])
@@ -897,7 +898,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     ax.set_title("Impact of the positioning error on axes orientation")
 
     # Légende des couleurs (STD values)
-    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"STD {µm_std_values[i]:.1f} µm")
+    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"{µm_std_values[i]:.1f} µm")
                for i in range(len(std_values))]
     ax.legend(handles=handles, title="Positioning error (µm)")
 
@@ -977,7 +978,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
         ax.set_zlabel("Z (µm)")
         ax.legend()
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()
 
     # Calculez le nuage des positions du point de référence dans le repère original
@@ -1107,6 +1108,104 @@ def test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulat
 
     return subset_results
 
+def parallel_test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulations=50, m_noise_simulations=50,
+                                     voxel_size=(0.5, 0.455, 0.455), isotropic=True, n_jobs=-1):
+    """
+    Version parallèle de test_sensitivity_subset.
+    """
+    subset_results = {
+        ratio: {
+            std: {
+                "centroids": [[] for _ in range(n_simulations)],
+                "axes_lengths": [[] for _ in range(n_simulations)],
+                "angles_deviation": [[] for _ in range(n_simulations)],
+                "orientations": [[] for _ in range(n_simulations)]
+            }
+            for std in std_values
+        }
+        for ratio in subset_ratios
+    }
+
+    full_center_of_mass = compute_center_of_mass(points)
+
+    def process_one_simulation(ratio, std, i):
+        """
+        Effectue une simulation (choix d'un sous-ensemble et bruitage).
+        """
+        subset_points = points[np.random.choice(points.shape[0], int(ratio * points.shape[0]), replace=False)]
+
+        # Calcul de référence
+        center_of_mass = compute_center_of_mass(subset_points)
+        normalized_points, P = normalize_points(subset_points, center_of_mass)
+        K = compute_k_matrix(normalized_points)
+        q = run_douglas_rachford(K)
+        A, b, c = extract_parameters(q)
+        A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+        centroid_ref = calculate_centroid(A, b) - full_center_of_mass
+        eigvals, eigvecs = np.linalg.eigh(A)
+
+        order = np.argsort(eigvals)
+        eigvals = eigvals[order]
+        eigvecs = eigvecs[:, order]
+
+        eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs, PA, PD, centroid_ref)
+
+        results = {
+            "centroids": [],
+            "axes_lengths": [],
+            "angles_deviation": [],
+            "orientations": []
+        }
+
+        for _ in range(m_noise_simulations):
+            perturbed_points = perturb_points_anisotropic(subset_points, std, voxel_size, isotropic)
+
+            # Pipeline de fit
+            center_of_mass = compute_center_of_mass(perturbed_points)
+            normalized_points, P = normalize_points(perturbed_points, center_of_mass)
+            K = compute_k_matrix(normalized_points)
+            q = run_douglas_rachford(K)
+            A, b, c = extract_parameters(q)
+            A, b, c = denormalize_parameters(A, b, c, center_of_mass, P)
+            centroid_perturbed = calculate_centroid(A, b) - full_center_of_mass
+            eigvals_perturbed, eigvecs_perturbed = np.linalg.eigh(A)
+
+            order = np.argsort(eigvals_perturbed)
+            eigvals_perturbed = eigvals_perturbed[order]
+            eigvecs_perturbed = eigvecs_perturbed[:, order]
+
+            eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(
+                eigvecs_perturbed, PA, PD, centroid_perturbed)
+
+            axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
+            angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
+
+            # Stocker les résultats localement
+            results["centroids"].append(centroid_perturbed)
+            results["axes_lengths"].append(axes_lengths_perturbed)
+            results["angles_deviation"].append(angles_deviation)
+            results["orientations"].append(eigvecs_perturbed)
+
+        return ratio, std, i, results
+
+    # Lancer en parallèle
+    parallel_results = Parallel(n_jobs=n_jobs)(
+        delayed(process_one_simulation)(ratio, std, i)
+        for ratio in subset_ratios
+        for std in std_values
+        for i in range(n_simulations)
+    )
+
+    # Stocker proprement les résultats
+    for ratio, std, i, results in parallel_results:
+        subset_results[ratio][std]["centroids"][i] = results["centroids"]
+        subset_results[ratio][std]["axes_lengths"][i] = results["axes_lengths"]
+        subset_results[ratio][std]["angles_deviation"][i] = results["angles_deviation"]
+        subset_results[ratio][std]["orientations"][i] = results["orientations"]
+
+    return subset_results
+
+
 def analyze_results_subset(subset_results, original_centroid, original_axes, voxel_size, u, v, w, reference_point,
                            m_noise_simulations):
     """
@@ -1121,7 +1220,7 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
     subset_ratios = sorted(subset_results.keys())
     std_values = sorted(subset_results[subset_ratios[0]].keys())
 
-    colors = plt.cm.viridis(np.linspace(0, 1, len(std_values)))
+    colors = plt.cm.plasma(np.linspace(0, 1, len(std_values)))
 
     # 📌 Déviation du centroïde en µm (moyenne des moyennes)
     plt.figure(figsize=(8, 5))
@@ -1138,12 +1237,12 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
         ]
 
         plt.plot([int(r * 89) for r in subset_ratios], centroid_errors_um, marker='o', linestyle='-',
-                 label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+                 label=f"{std * voxel_size[1]:.1f} µm", color=colors[i])
 
     plt.xlabel("Total points used")
     plt.ylabel("Mean displacement of the origin (µm)")
     plt.title("Impact of point count and noise on origin displacement")
-    plt.legend()
+    plt.legend(title="Positioning error (µm)")
     plt.grid(True)
     plt.show()
 
@@ -1179,13 +1278,13 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
                 for r in subset_ratios
             ]
 
-            ax.plot([int(r * 100) for r in subset_ratios], mean_angular_deviation, marker='o', linestyle='-',
-                    label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+            ax.plot([int(r * 89) for r in subset_ratios], mean_angular_deviation, marker='o', linestyle='-',
+                    label=f"{std * voxel_size[1]:.1f} µm", color=colors[i])
 
         ax.set_xlabel("Total points used")
         ax.set_ylabel("Mean angular deviation (°)")
         ax.set_title(f"Impact of point count and noise on {axis_labels[axis]}")
-        ax.legend()
+        ax.legend(title="Positioning error (µm)")
         ax.grid(True)
         ax.set_ylim(y_min, y_max)  # Assurer une échelle commune en Y
 
@@ -1222,13 +1321,13 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
             # 🔹 Enfin, moyenne sur les N simulations
             mean_distances.append(np.mean(distances_for_ratio))
 
-        plt.plot([int(r * 100) for r in subset_ratios], mean_distances, marker='o', linestyle='-',
-                 label=f"STD {std * voxel_size[1]:.1f} µm", color=colors[i])
+        plt.plot([int(r * 89) for r in subset_ratios], mean_distances, marker='o', linestyle='-',
+                 label=f"{std * voxel_size[1]:.1f} µm", color=colors[i])
 
     plt.xlabel("Total points used")
     plt.ylabel("Mean distance from reference point (µm)")
     plt.title("Impact of point count and noise on the reference point location")
-    plt.legend()
+    plt.legend(title="Positioning error (µm)")
     plt.grid(True)
     plt.show()
 
@@ -1405,21 +1504,27 @@ def main():
         dx = 0.455
         µm_std_values = [0.5, 1.0, 1.5, 2.0]
         std_values = [x / dx for x in µm_std_values]
-        results, u, v, w = test_sensitivity_multiple_std(points, PA, PD, n_simulations=5, std_values=std_values,
+        results, u, v, w = test_sensitivity_multiple_std(points, PA, PD, n_simulations=10000, std_values=std_values,
                                                          voxel_size=voxel_size, isotropic=True)
         # Analyse des résultats
         reference_point = np.array([[136., 159.1073856, 128.1624962]])  # Point de référence
         analyze_results_multiple_std(centroid, u, v, w, np.sqrt(1 / eigvals),
                                      results, voxel_size, reference_point, viewer)
 
+    # Test de sensibilité au bruit en fonction du nombre de points placés
+    import time
+    start = time.time()
     subset_ratios = [0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]  # Pourcentages des points à tester
-    noise_simulations = 1000
-    points_nb_simulations = 1000
-    subset_results = test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulations=points_nb_simulations,
-                                             m_noise_simulations= noise_simulations, voxel_size=voxel_size)
+    noise_simulations = 100
+    points_nb_simulations = 100
+    subset_results = parallel_test_sensitivity_subset(points, PA, PD, subset_ratios, std_values,
+                                                      n_simulations=points_nb_simulations,
+                                                      m_noise_simulations=noise_simulations,
+                                                      voxel_size=voxel_size)
+
     analyze_results_subset(subset_results, centroid, np.sqrt(1 / eigvals), voxel_size, u, v, w, reference_point,
                            m_noise_simulations=noise_simulations)
-
+    print("temps de calcul: ", time.time() - start)
 
     # Ajout du point d'origine (centroïde)
     viewer.add_points([centroid], name="Origine", size=5, face_color="blue")
