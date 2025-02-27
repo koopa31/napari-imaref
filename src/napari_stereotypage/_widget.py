@@ -345,36 +345,55 @@ class StereotypingWidget(QWidget):
         webbrowser.open("https://stereotyping-doc.readthedocs.io/en/latest/index.html#")
 
     def select_folder_and_load_image(self):
+        '''
+        Select folder -
+        Look for files containing the Sample_id, and reorganise them according
+        to the this Sample_id, regardless of the color_id -
+        Load images with the same Sample_id
+        '''
+
+        #Get parameters input
         self.Sample_id = str(self.Sample_id_imput.text())
-        self.Color_number = int(self.Color_number_imput.text())  # Convert Color_number_imput to integer
+        self.Color_number = int(self.Color_number_imput.text())
+        self.Color_id_green = str(self.Color_id_green_input.text())
+        self.Color_id_blue = str(self.Color_id_blue_input.text())
+        self.Color_id_red = str(self.Color_id_red_input.text())
         folder = QFileDialog.getExistingDirectory(None, "Select Folder")
+
         if folder:
             image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
             self.image_paths = []
             while len(image_list)>0:
-                #check the substring identifying files from the same sample
+                #check for presence of the substring identifying files from the same sample
                 image_test = image_list[0]
                 if not self.Sample_id in image_test:
                     image_list.remove(image_test)
                 else:
-                    identifier = image_test.split(self.Sample_id)
-                    identifier = self.Sample_id + identifier[1]
+                    # identifier : string that is unique to a sample, regardless to the color
+                    identifier = image_test.split(self.Sample_id)[1]
+                    # remove Color_id if present in identifer
+                    if self.Color_id_green in identifier and self.Color_id_green != '': 
+                        identifier = identifier.split(self.Color_id_green)[0]
+                    if self.Color_id_blue in identifier and self.Color_id_blue != '':
+                        identifier = identifier.split(self.Color_id_blue)[0]
+                    if self.Color_id_red in identifier and self.Color_id_red != '':
+                        identifier = identifier.split(self.Color_id_red)[0]
+                    identifier = self.Sample_id + identifier
                     for file in image_list:
-                        # reorder image list corresponding to sample files
-                        if file.endswith(identifier):
+                        # add image corresponding to the same sample to image_paths
+                        if identifier in file:
                             self.image_paths.append(file)
                             image_list.remove(file)
             self.current_image_index = 0
-
             if self.image_paths:
                 self.image_selector.clear()
                 self.total_images = len(self.image_paths) // self.Color_number
 
-                # Ajouter des identifiants dans le menu déroulant en fonction de Sample_id
+                # Add unique sample id to the menu bar
                 unique_identifiers = [f"{self.Sample_id}{i}" for i in range(1, self.total_images + 1)]
                 self.image_selector.addItems(unique_identifiers)
 
-                # Charger la première image
+                # Load first images
                 self.load_image_at_index(0)
             else:
                 show_info("No images found in the folder.")
@@ -384,20 +403,15 @@ class StereotypingWidget(QWidget):
         Check the color of each image from the same sample
         Apply blending (additive), auto-contrast, and the appropriate color.
         """
-        # Récupération des paramètres nécessaires
-        self.Color_number = int(self.Color_number_imput.text())
-        self.Color_id_green = str(self.Color_id_green_input.text())
-        self.Color_id_blue = str(self.Color_id_blue_input.text())
-        self.Color_id_red = str(self.Color_id_red_input.text())
 
-        # Chargement des images en fonction de current_image_index
+        # Load images depending on current_image_index
         start_index = self.current_image_index
         end_index = start_index + self.Color_number
 
         for i, image_path in enumerate(self.image_paths[start_index:end_index]):
             image = imread(image_path)
 
-            # Déterminer la couleur basée sur l'identifiant
+            # Add appropriate color based on Color_id
             if self.Color_id_red in image_path:
                 layer_name = 'Image red'
                 colormap = 'red'
@@ -411,19 +425,19 @@ class StereotypingWidget(QWidget):
                 layer_name = f'Image_{i}'
                 colormap = 'gray'
 
-            # Ajouter l'image à Napari avec les paramètres
+            # Add image to napari.viewer with its paramaters
             self.viewer.add_image(image, name=layer_name)
             self.viewer.layers[layer_name].blending = 'additive'
             self.viewer.layers[layer_name].colormap = colormap
             self.viewer.dims.set_point(0, len(self.viewer.layers[layer_name].data) / 2)
             self.viewer.layers[layer_name].reset_contrast_limits()
 
-        # Ajouter un calque de points pour l'annotation
+        # Add point layers for annotating
         points_layer = self.viewer.add_points(ndim=3, name='Points')
         points_layer.mode = 'add'
         points_layer.events.data.connect(self.on_points_update)
 
-        # Affichage en 2D
+        # Viewer in 2D
         self.viewer.dims.ndisplay = 2
 
     def update_instructions(self, num_points):
