@@ -22,6 +22,19 @@ from ._functions import (compute_center_of_mass, normalize_points, compute_k_mat
                          extract_parameters, calculate_centroid, orienter_axes, visualize_ellipsoid)
 
 
+# Gestion Bug Napari sur le dessin dans Shapes
+def custom_exception_handler(exc_type, exc_value, exc_traceback):
+    """Intercepte les erreurs de Napari liées à _moving_value et les ignore."""
+    if exc_type == TypeError and "list indices must be integers or slices, not NoneType" in str(exc_value):
+        print("⚠️ Napari error ignored : _moving_value is None (well-known bug)")
+    else:
+        # Afficher les autres erreurs normalement
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+# Appliquer le hook globalement
+sys.excepthook = custom_exception_handler
+
+
 def check_for_update(plugin_name="napari-stereotypage", viewer=None):
     try:
         # Get the installed version of the plugin
@@ -432,7 +445,12 @@ class StereotypingWidget(QWidget):
             self.viewer.dims.set_point(0, len(self.viewer.layers[layer_name].data) / 2)
             self.viewer.layers[layer_name].reset_contrast_limits()
 
-        # Add point layers for annotating
+        # Ajouter un calque de shapes pour l'annotation en traçant des lignes à main levée
+        shapes_layer = self.viewer.add_shapes(ndim=3, name='Lines')
+        shapes_layer.mode = 'add_path'
+        shapes_layer.mouse_drag_callbacks.append(self.on_shape_mouse_release)
+
+        # Ajouter un calque de points pour l'annotation
         points_layer = self.viewer.add_points(ndim=3, name='Points')
         points_layer.mode = 'add'
         points_layer.events.data.connect(self.on_points_update)
@@ -482,6 +500,27 @@ class StereotypingWidget(QWidget):
             points_layer.current_face_color = [0, 1, 0, 1]  # Vert
         else:  # Prochain point : Dorsaux
             points_layer.current_face_color = [0, 0, 1, 1]  # Bleu
+
+    def on_shape_mouse_release(self, layer, event):
+        """Ajoute les points du tracé seulement lorsque la souris est relâchée"""
+        # ✅ Attendre activement le relâchement de la souris
+        while event.type != "mouse_release":
+
+            yield  # ✅ Attendre sans bloquer
+
+        # Vérifier que des formes existent
+        if len(layer.data) > 0:
+            last_traced_points = layer.data[-1]  # Dernière forme ajoutée
+
+            if all(point is not None for point in last_traced_points) and len(last_traced_points) > 1:
+                # Ajouter les points au calque "Points"
+                points_layer = self.viewer.layers["Points"]
+                new_points = np.vstack((points_layer.data, last_traced_points)) if len(
+                    points_layer.data) > 0 else last_traced_points
+                points_layer.data = new_points  # Mise à jour
+
+            # Supprimer le tracé après ajout des points
+            layer.data = []
 
 
     # @magicgui(call_button="Calculate Coordinates")
@@ -589,6 +628,11 @@ class StereotypingWidget(QWidget):
         self.current_image_index = index * self.Color_number  # Calculer l'indice de départ
         self.viewer.layers.clear()  # Nettoyer les calques existants
         self.load_image()  # Charger les images
+
+        # Forcer l'activation du dessin dans le Lines layer
+        shapes_layer = self.viewer.layers["Lines"]
+        if shapes_layer:
+            shapes_layer.mode = "add_path"
 
         # Mettre à jour les widgets sans déclencher d'événements redondants
         self.image_index.blockSignals(True)
