@@ -32,9 +32,6 @@ You can install `napari_stereotypage` via [pip]:
     pip install napari_stereotypage
 
 
-![](https://github.com/koopa31/napari_stereotypage/blob/38300132d34479ebbad7dd66b234d32bcb4cefb4/Image/gif_readme.gif)
-
-
 ## Documentation
 
 A [documentation] is available to understand how to effectively learn how to use the plugin. 
