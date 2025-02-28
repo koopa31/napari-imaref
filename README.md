@@ -10,6 +10,9 @@
 Stereotyping 3D images of the zebrafish olfactory system by defining a reproducible reference frame. 
 The method relies on ellipsoid fitting based on manually placed landmark points.
 
+
+![](https://github.com/koopa31/stereotyping_doc/blob/main/docs/images/placer_points.gif?raw=true)
+
 ----------------------------------
 
 This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
