@@ -6,6 +6,16 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from joblib import Parallel, delayed
 
+plt.rcParams.update({
+    'axes.titlesize': 20,       # Taille du titre
+    'axes.labelsize': 15,       # Taille des labels des axes
+    'legend.fontsize': 13,      # Taille du texte de la légende
+    'legend.title_fontsize': 15,# Taille du titre de la légende
+    'xtick.labelsize': 15,      # Taille des valeurs sur l'axe X
+    'ytick.labelsize': 15,       # Taille des valeurs sur l'axe Y
+    'lines.linewidth': 3
+})
+
 
 def compute_center_of_mass(points):
     """Calcul du centre de masse."""
@@ -824,9 +834,11 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     plt.figure(figsize=(8, 5))
     plt.boxplot(centroid_errors_um, labels=[f"{x:.1f}" for x in µm_std_values])
     plt.xlabel("Positioning error (µm)")
-    plt.ylabel("Displacement of the origin of the reference frame (µm)")
+    plt.ylabel("Displacement of the origin of \n the reference frame (µm)")
     plt.title("Impact of positioning error on origin position (µm)")
     plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("fig1_1.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # 📌 Déviation des longueurs d'axes (X, Y, Z)
@@ -868,6 +880,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     ax.legend(handles=handles, title="Positioning error (µm)")
 
     ax.grid(True)
+    plt.savefig("fig1_2.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # 📌 Déviation angulaire des axes (X, Y, Z)
@@ -903,6 +916,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     ax.legend(handles=handles, title="Positioning error (µm)")
 
     ax.grid(True)
+    plt.savefig("fig1_3.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # 🔹 Calcul des distances du point fixé dans les repères perturbés
@@ -915,8 +929,10 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     plt.boxplot(distances, tick_labels=[f"{x:.1f}" for x in µm_std_values])
     plt.xlabel("Positioning error (µm)")
     plt.ylabel("Distance from set point (µm)")
-    plt.title("Impact of positioning error on the reference point location in disturbed reference frames")
+    plt.title("Impact of positioning error on the reference point \n location in disturbed reference frames")
     plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("fig1_4.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # 📌 Visualisation 3D des perturbations pour chaque std
@@ -979,6 +995,7 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
         ax.legend()
 
     #plt.tight_layout()
+    plt.savefig("fig1_5.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # Calculez le nuage des positions du point de référence dans le repère original
@@ -1244,6 +1261,7 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
     plt.title("Impact of point count and noise on origin displacement")
     plt.legend(title="Positioning error (µm)")
     plt.grid(True)
+    plt.savefig("fig2_1.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     # 📌 Déviation angulaire moyenne des axes (Z, Y, X) en fonction du nombre de points
@@ -1289,6 +1307,7 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
         ax.set_ylim(y_min, y_max)  # Assurer une échelle commune en Y
 
     plt.tight_layout()
+    plt.savefig("fig2_2.svg", format="svg", bbox_inches="tight")
     plt.show()
 
     for i, std in enumerate(std_values):
@@ -1325,10 +1344,12 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
                  label=f"{std * voxel_size[1]:.1f} µm", color=colors[i])
 
     plt.xlabel("Total points used")
-    plt.ylabel("Mean distance from reference point (µm)")
-    plt.title("Impact of point count and noise on the reference point location")
+    plt.ylabel("Mean distance from reference \n point (µm)")
+    plt.title("Impact of point count and noise \n on the reference point location")
     plt.legend(title="Positioning error (µm)")
     plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("fig2_3.svg", format="svg", bbox_inches="tight")
     plt.show()
 
 
