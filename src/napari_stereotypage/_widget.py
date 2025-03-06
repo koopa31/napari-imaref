@@ -376,6 +376,7 @@ class StereotypingWidget(QWidget):
         if folder:
             image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
             self.image_paths = []
+            self.identifier_list = []
             while len(image_list)>0:
                 #check for presence of the substring identifying files from the same sample
                 image_test = image_list[0]
@@ -392,6 +393,8 @@ class StereotypingWidget(QWidget):
                     if self.Color_id_red in identifier and self.Color_id_red != '':
                         identifier = identifier.split(self.Color_id_red)[0]
                     identifier = self.Sample_id + identifier
+                    if identifier not in self.identifier_list: 
+                        self.identifier_list.append(identifier)
                     for file in image_list:
                         # add image corresponding to the same sample to image_paths
                         if identifier in file:
@@ -403,8 +406,7 @@ class StereotypingWidget(QWidget):
                 self.total_images = len(self.image_paths) // self.Color_number
 
                 # Add unique sample id to the menu bar
-                unique_identifiers = [f"{self.Sample_id}{i}" for i in range(1, self.total_images + 1)]
-                self.image_selector.addItems(unique_identifiers)
+                self.image_selector.addItems(self.identifier_list)
 
                 # Load first images
                 self.load_image_at_index(0)
@@ -638,7 +640,7 @@ class StereotypingWidget(QWidget):
         self.image_index.blockSignals(True)
         self.image_selector.blockSignals(True)
 
-        self.image_index.setText(str(index + 1))  # Met à jour l'indice affiché
+        self.image_index.setText(str(self.identifier_list[index]))  # Met à jour l'indice affiché
         self.image_selector.setCurrentIndex(index)  # Met à jour la sélection
         self.progress_bar.setValue(int((index / self.total_images) * 100))  # Barre de progression
 
@@ -656,7 +658,7 @@ class StereotypingWidget(QWidget):
         self.load_image()
 
         # Mettre à jour l'index dans le champ `image_index`
-        self.image_index.setText(str(index + 1))
+        self.image_index.setText(str(self.identifier_list[index]))
 
         # Mettre à jour la sélection dans le menu déroulant `image_selector`
         self.image_selector.setCurrentIndex(index)
