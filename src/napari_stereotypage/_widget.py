@@ -580,10 +580,20 @@ class StereotypingWidget(QWidget):
                                                                                              self.u, self.v,
                                                                                              self.w))
             self.update_instructions(10)
-
+            if "Axe X" in self.viewer.layers:
+                self.viewer.layers.remove("Axe X")
+            if "Axe Y" in self.viewer.layers:
+                self.viewer.layers.remove("Axe Y")
+            if "Axe Z" in self.viewer.layers:
+                self.viewer.layers.remove("Axe Z")
+            if "Origine" in self.viewer.layers:
+                self.viewer.layers.remove("Origine")
             if self.show_axes_checkbox.isChecked():
                 draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
                 draw_origin(self.viewer, self.nouvelle_origine)
+            
+            if "Ellipsoide" in self.viewer.layers:
+                self.viewer.layers.remove("Ellipsoide")
             if self.show_ellipsoid_checkbox.isChecked():
                 visualize_ellipsoid(A, self.nouvelle_origine, eigvecs, self.viewer)
             else:

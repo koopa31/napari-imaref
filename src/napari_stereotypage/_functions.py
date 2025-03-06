@@ -169,19 +169,19 @@ def denormalize_parameters(A, b, c, center_of_mass, P):
 
 
 def calculate_centroid(A, b):
-    """Calcul du centroïde."""
+    """Calcul du centroide."""
     centroid = -np.linalg.solve(A, b)
-    print(f"Centroïde calculé : {centroid}")
+    print(f"Centroide calculé : {centroid}")
     return centroid
 
 
 def refine_scale_factor(A, centroid, eigvecs, points):
     """
-    Calcule le facteur d'échelle optimal pour ajuster l'ellipsoïde aux points.
+    Calcule le facteur d'échelle optimal pour ajuster l'ellipsoide aux points.
 
     Args:
-    - A: Matrice de l'ellipsoïde.
-    - centroid: Coordonnées du centroïde.
+    - A: Matrice de l'ellipsoide.
+    - centroid: Coordonnées du centroide.
     - eigvecs: Vecteurs propres de la matrice A.
     - points: Points d'entrée.
 
@@ -191,14 +191,14 @@ def refine_scale_factor(A, centroid, eigvecs, points):
     eigvals, _ = np.linalg.eigh(A)
     axes_lengths = np.sqrt(1 / eigvals)  # Longueurs initiales des axes
 
-    # Fonction pour calculer la distance d'un point à l'ellipsoïde
+    # Fonction pour calculer la distance d'un point à l'ellipsoide
     def distance_to_ellipsoid_scale(scale):
         scaled_axes = axes_lengths * scale
         distances = []
         for point in points:
             relative_point = eigvecs.T @ (point - centroid)  # Transformer le point dans le repère principal
             normalized_point = relative_point / scaled_axes  # Normaliser par les axes
-            distance = np.linalg.norm(normalized_point) - 1  # Distance à la surface de l'ellipsoïde
+            distance = np.linalg.norm(normalized_point) - 1  # Distance à la surface de l'ellipsoide
             distances.append(distance ** 2)
         return np.mean(distances)
 
@@ -211,7 +211,7 @@ def refine_scale_factor(A, centroid, eigvecs, points):
 
 
 def visualize_ellipsoid(A, centroid, eigvecs, viewer):
-    """Visualisation de l'ellipsoïde dans Napari avec rendu lisse."""
+    """Visualisation de l'ellipsoide dans Napari avec rendu lisse."""
     # Calculer le facteur d'échelle optimal
     scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
     eigvals, _ = np.linalg.eigh(A)
@@ -222,7 +222,7 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
     v = np.linspace(0, np.pi, 100)
     u, v = np.meshgrid(u, v)
 
-    # Points sur une sphère transformée en ellipsoïde
+    # Points sur une sphère transformée en ellipsoide
     x = axes_lengths[0] * np.cos(u) * np.sin(v)
     y = axes_lengths[1] * np.sin(u) * np.sin(v)
     z = axes_lengths[2] * np.cos(v)
@@ -247,7 +247,7 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
     faces = np.array(faces)
 
     # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
-    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoïde", opacity=0.10, blending="additive",
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoide", opacity=0.10, blending="additive",
                        colormap="blue")
 
 
@@ -363,7 +363,7 @@ def draw_origin(viewer, origine):
 
 
 def visualize_ellipsoid(A, centroid, eigvecs, viewer):
-    """Visualisation de l'ellipsoïde dans Napari avec rendu lisse."""
+    """Visualisation de l'ellipsoide dans Napari avec rendu lisse."""
     # Calculer le facteur d'échelle optimal
     scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
     eigvals, _ = np.linalg.eigh(A)
@@ -374,7 +374,7 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
     v = np.linspace(0, np.pi, 100)
     u, v = np.meshgrid(u, v)
 
-    # Points sur une sphère transformée en ellipsoïde
+    # Points sur une sphère transformée en ellipsoide
     x = axes_lengths[0] * np.cos(u) * np.sin(v)
     y = axes_lengths[1] * np.sin(u) * np.sin(v)
     z = axes_lengths[2] * np.cos(v)
@@ -399,5 +399,5 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
     faces = np.array(faces)
 
     # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
-    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoïde", opacity=0.10, blending="additive",
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoide", opacity=0.10, blending="additive",
                        colormap="blue")
