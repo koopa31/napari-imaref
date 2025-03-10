@@ -371,10 +371,10 @@ class StereotypingWidget(QWidget):
         self.Color_id_green = str(self.Color_id_green_input.text())
         self.Color_id_blue = str(self.Color_id_blue_input.text())
         self.Color_id_red = str(self.Color_id_red_input.text())
-        folder = QFileDialog.getExistingDirectory(None, "Select Folder")
+        self.folder = QFileDialog.getExistingDirectory(None, "Select Folder")
 
-        if folder:
-            image_list = [os.path.join(folder, f) for f in sorted(os.listdir(folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+        if self.folder:
+            image_list = [os.path.join(self.folder, f) for f in sorted(os.listdir(self.folder)) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
             self.image_paths = []
             self.identifier_list = []
             while len(image_list)>0:
@@ -459,6 +459,19 @@ class StereotypingWidget(QWidget):
 
         # Viewer in 2D
         self.viewer.dims.ndisplay = 2
+
+        #Ajoute un repere et une ellipsoide si déja calcules
+        csv_name = self.image_paths[start_index]
+        csv_name = csv_name.rsplit('.',1)[0] + '.csv'
+        csv_name = os.path.split(csv_name)[1]
+        print(csv_name)
+        if csv_name in os.listdir(self.folder):
+            df = pd.read_csv(os.path.join(self.folder,csv_name), header=None)
+            origin = list(map(float, df[0][1].strip("[]").split()))
+            u, v, w = list(map(float, df[1][1].strip("[]").split())), list(map(float, df[2][1].strip("[]").split())), list(map(float, df[3][1].strip("[]").split()))
+            origin, u, v, w = np.array(origin), np.array(u), np.array(v), np.array(w)
+            draw_axes(self.viewer, origin, u, v, w)
+            draw_origin(self.viewer, origin)
 
     def update_instructions(self, num_points):
         instructions = [
@@ -576,7 +589,7 @@ class StereotypingWidget(QWidget):
                                       reoriented_eigvecs[:, 2].copy())
 
             # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
-            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index - 1], (self.nouvelle_origine,
+            csv_filename = save_data_to_csv(self.image_paths[(self.current_image_index - 1)*self.Color_number], (self.nouvelle_origine,
                                                                                              self.u, self.v,
                                                                                              self.w))
             self.update_instructions(10)
