@@ -609,7 +609,8 @@ class StereotypingWidget(QWidget):
                 self.viewer.layers.remove("Ellipsoide")
             if self.show_ellipsoid_checkbox.isChecked():
                 visualize_ellipsoid(A, self.nouvelle_origine, eigvecs, self.viewer)
-            else:
+            
+            if not self.show_axes_checkbox.isChecked() and not self.show_ellipsoid_checkbox.isChecked():
                 self.next_image()
 
 
