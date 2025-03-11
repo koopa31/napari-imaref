@@ -86,6 +86,8 @@ class CoordinateTransformationWidget(QWidget):
         """
         Load and display the introductory image when the widget is initialized.
         """
+        if len(self.viewer.layers) != 0:
+            self.viewer.layers.clear()
         script_dir = os.path.dirname(os.path.abspath(__file__))
         image_path = os.path.join(script_dir, "Image", "instructions.webp")
         if os.path.exists(image_path):
