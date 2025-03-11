@@ -16,6 +16,9 @@ contributions:
     - id: napari_stereotypage.make_stereotyping_widget
       python_name: napari_stereotypage._widget:StereotypingWidget
       title: Stereotyping Widget
+    - id: napari_stereotypage.make_points_transformation_widget
+      python_name: napari_stereotypage._points_transformation_widget:CoordinateTransformationWidget
+      title: Coordinates Transformation Widget
   readers:
     - command: napari_stereotypage.get_reader
       accepts_directories: false
@@ -30,3 +33,5 @@ contributions:
   widgets:
     - command: napari_stereotypage.make_stereotyping_widget
       display_name: Stereotyping Widget
+    - command: napari_stereotypage.make_points_transformation_widget
+      display_name: Coordinates Transformation Widget
