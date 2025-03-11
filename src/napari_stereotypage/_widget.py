@@ -466,7 +466,6 @@ class StereotypingWidget(QWidget):
         csv_name = self.image_paths[start_index]
         csv_name = csv_name.rsplit('.',1)[0] + '.csv'
         csv_name = os.path.split(csv_name)[1]
-        print(csv_name)
         if csv_name in os.listdir(self.folder):
             df = pd.read_csv(os.path.join(self.folder,csv_name), header=None)
             origin = list(map(float, df[0][1].strip("[]").split()))
@@ -591,7 +590,7 @@ class StereotypingWidget(QWidget):
                                       reoriented_eigvecs[:, 2].copy())
 
             # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
-            csv_filename = save_data_to_csv(self.image_paths[(self.current_image_index - 1)*self.Color_number], (self.nouvelle_origine,
+            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index * self.Color_number], (self.nouvelle_origine,
                                                                                              self.u, self.v,
                                                                                              self.w))
             self.update_instructions(10)
