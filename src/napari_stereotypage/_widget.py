@@ -326,7 +326,8 @@ class StereotypingWidget(QWidget):
             if response.status_code == 200:
                 pixmap = QPixmap()
                 pixmap.loadFromData(response.content)
-                pixmap = pixmap.scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pixmap = pixmap.scaled(int(0.8 * layout.sizeHint().width()), int(0.8 * layout.sizeHint().width()),
+                                       Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 logo_label = QLabel()
                 logo_label.setPixmap(pixmap)
                 logo_label.setAlignment(Qt.AlignCenter)
