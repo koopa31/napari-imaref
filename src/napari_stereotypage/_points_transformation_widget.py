@@ -5,7 +5,9 @@ from napari import Viewer
 import os
 import pandas as pd
 import numpy as np
-from skimage.io import imread
+import requests
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QIcon, QPixmap
 from xml.etree import ElementTree as ET
 from skimage.io import imread
 from skimage.measure import regionprops
@@ -80,7 +82,37 @@ class CoordinateTransformationWidget(QWidget):
         layout.addWidget(self.run_button)
         layout.addWidget(self.progress_bar)
 
+        # Vertical spacing to separate the doc from the rest of the layout
+        layout.addSpacing(80)
+
+        # Ajout du texte d'aide pour la première utilisation
+        first_time_label = QLabel("First time using this tool? <br>Check the documentation for guidance!")
+        first_time_label.setStyleSheet("font-size: 18px; font-family: Arial; color: white;")  # Style optionnel
+        first_time_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(first_time_label)
+
+        # Link to the documentation
+        open_doc_button = QPushButton("DOCUMENTATION")
+        open_doc_button.setToolTip("Open the online documentation")
+        # Check if internet connection is working to set the icon, else do nothing
+        try:
+            url = "https://bitbucket.org/koopa31/napari_svetlana/raw/c7438ec591fa5e23f03cfb17f4984e9f52571649/src/doc.png"
+            response = requests.get(url)
+            pixmap = QPixmap()
+            pixmap.loadFromData(response.content)
+            icon = QIcon(pixmap)
+            open_doc_button.setIcon(icon)
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to load documentation button icon: {e}")
+            pass
+        open_doc_button.clicked.connect(self.open_doc)
+        layout.addWidget(open_doc_button)
+
         self.setLayout(layout)
+
+    def open_doc(self):
+        import webbrowser
+        webbrowser.open("https://stereotyping-doc.readthedocs.io/en/latest/index.html#")
 
     def load_intro_image(self):
         """
