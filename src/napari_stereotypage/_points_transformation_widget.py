@@ -93,6 +93,7 @@ class CoordinateTransformationWidget(QWidget):
         if os.path.exists(image_path):
             im_accueil = imread(image_path)
             self.viewer.add_image(im_accueil, name="Intro Image")
+            self.viewer.reset_view()
         else:
             print(f"Introductory image not found at {image_path}")
 

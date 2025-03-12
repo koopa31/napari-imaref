@@ -320,7 +320,7 @@ class StereotypingWidget(QWidget):
         layout.addWidget(open_doc_button)
 
         # Set logo if internet connexion works
-        try:
+        """try:
             logo_url = "https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png"
             response = requests.get(logo_url)
             if response.status_code == 200:
@@ -334,7 +334,7 @@ class StereotypingWidget(QWidget):
                 layout.addWidget(logo_label)
         except requests.exceptions.RequestException as e:
             print(f"Failed to load logo: {e}")
-            pass
+            pass"""
 
 
         # Set the layout
@@ -368,7 +368,7 @@ class StereotypingWidget(QWidget):
         if len(self.viewer.layers) != 0:
             self.viewer.layers.clear()
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(script_dir, "Image", "Image_accueil.webp")
+        image_path = os.path.join(script_dir, "Image", "logo.png")
         if os.path.exists(image_path):
             im_accueil = imread(image_path)
             self.viewer.add_image(im_accueil, name="Intro Image")
