@@ -154,6 +154,8 @@ class StereotypingWidget(QWidget):
     def __init__(self, viewer: Viewer):
         super().__init__()
         self.viewer = viewer
+        # This function ensures add_path mode activation in Lines layer when switching back from 3D to 2D visualization
+        self.viewer.dims.events.ndisplay.connect(self.on_display_change)
         self.initUI()
         self.load_intro_image()
 
@@ -340,6 +342,23 @@ class StereotypingWidget(QWidget):
 
         check_for_update(plugin_name="napari-stereotypage", viewer=self.viewer)
 
+    def on_display_change(self, event):
+        """
+        # This function ensures add_path mode activation in Lines layer when switching back from 3D to 2D visualization.
+        Otherwise, add_path activation does not work automatically.
+        :param event:
+        :return:
+        """
+        # If we switch back to 2D
+        if self.viewer.dims.ndisplay == 2:
+            if self.viewer.layers["Lines"]:
+                # If Lines layer exists, we activate add_path mode
+                self.viewer.layers["Lines"].mode = "add_path"
+                # Once activated, we set Points or Lines layer active to be able to draw directly
+                if self.viewer.layers["Points"]:
+                    self.viewer.layers.selection.active = self.viewer.layers["Points"]
+                else:
+                    self.viewer.layers.selection.active = self.viewer.layers["Lines"]
 
     def load_intro_image(self):
         """
