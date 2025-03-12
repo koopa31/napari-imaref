@@ -665,7 +665,7 @@ class StereotypingWidget(QWidget):
         self.image_index.blockSignals(True)
         self.image_selector.blockSignals(True)
 
-        self.image_index.setText(str(self.identifier_list[index]))  # Met à jour l'indice affiché
+        self.image_index.setText(str(index + 1))  # Met à jour l'indice affiché
         self.image_selector.setCurrentIndex(index)  # Met à jour la sélection
         self.progress_bar.setValue(int((index / self.total_images) * 100))  # Barre de progression
 
@@ -683,7 +683,7 @@ class StereotypingWidget(QWidget):
         self.load_image()
 
         # Mettre à jour l'index dans le champ `image_index`
-        self.image_index.setText(str(self.identifier_list[index]))
+        self.image_index.setText(str(index + 1))
 
         # Mettre à jour la sélection dans le menu déroulant `image_selector`
         self.image_selector.setCurrentIndex(index)
