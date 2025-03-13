@@ -575,10 +575,10 @@ class StereotypingWidget(QWidget):
             PD = points[1, :] # Second point in the dataset (used for orientation reference)
 
             # Compute the center of mass of the given points.
-            center_of_mass = compute_center_of_mass(points)
+            center_of_mass = compute_center_of_mass(points[2, :])
 
             # Normalize the points by translating them to the center of mass.
-            normalized_points, P = normalize_points(points, center_of_mass)
+            normalized_points, P = normalize_points(points[2, :], center_of_mass)
 
             # Compute the K matrix, which is used for ellipsoid fitting.
             K = compute_k_matrix(normalized_points)
