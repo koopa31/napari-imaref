@@ -610,7 +610,7 @@ class StereotypingWidget(QWidget):
                                       reoriented_eigvecs[:, 2].copy())
 
             # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
-            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index * self.Color_number], (self.nouvelle_origine,
+            csv_filename = save_data_to_csv(self.image_paths[(self.current_image_index-1) * self.Color_number], (self.nouvelle_origine,
                                                                                              self.u, self.v,
                                                                                              self.w))
             self.update_instructions(10)
