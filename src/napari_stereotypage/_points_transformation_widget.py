@@ -189,6 +189,7 @@ class CoordinateTransformationWidget(QWidget):
             base_name = point_file.replace("_points.csv", "")
             points_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+            newpoints_csv_path = os.path.join(input_folder, base_name + "_newpoints.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(ref_csv_path):
@@ -202,11 +203,14 @@ class CoordinateTransformationWidget(QWidget):
             df = pd.read_csv(points_csv_path)
 
             # Ensure the required columns exist
-            if not {"Z", "Y", "X"}.issubset(df.columns):
+            if {"Z", "Y", "X"}.issubset(df.columns):
+                points = df[["Z", "Y", "X"]].values
+            elif {"axis-0", "axis-1", "axis-2"}.issubset(df.columns):
+                points = df[["axis-0", "axis-1", "axis-2"]].values
+            else:
                 print(f"⚠️ Skipping {point_file}: Missing required columns (Z, Y, X).")
                 continue
 
-            points = df[["Z", "Y", "X"]].values
 
             # Transform the points
             transformed_points = transform_points(points, origin, u, v, w)
@@ -215,8 +219,8 @@ class CoordinateTransformationWidget(QWidget):
             df[["X_new", "Y_new", "Z_new"]] = transformed_points
 
             # Save the updated CSV
-            df.to_csv(points_csv_path, index=False)
-            print(f"✅ Transformed points saved in {points_csv_path}")
+            df.to_csv(newpoints_csv_path, index=False)
+            print(f"✅ Transformed points saved in {newpoints_csv_path}")
 
     # SECTION 2
 
