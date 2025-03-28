@@ -442,7 +442,7 @@ class StereotypingWidget(QWidget):
         """
 
         # Load images depending on current_image_index
-        start_index = self.current_image_index
+        start_index = self.current_image_index * self.Color_number
         end_index = start_index + self.Color_number
 
         for i, image_path in enumerate(self.image_paths[start_index:end_index]):
@@ -610,7 +610,7 @@ class StereotypingWidget(QWidget):
                                       reoriented_eigvecs[:, 2].copy())
 
             # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
-            csv_filename = save_data_to_csv(self.image_paths[(self.current_image_index-1) * self.Color_number], (self.nouvelle_origine,
+            csv_filename = save_data_to_csv(self.image_paths[self.current_image_index * self.Color_number], (self.nouvelle_origine,
                                                                                              self.u, self.v,
                                                                                              self.w))
             self.update_instructions(10)
@@ -672,7 +672,7 @@ class StereotypingWidget(QWidget):
             show_info("Invalid image index.")
             return
 
-        self.current_image_index = index * self.Color_number  # Calculer l'indice de départ
+        self.current_image_index = index  # Calculer l'indice de départ
         self.viewer.layers.clear()  # Nettoyer les calques existants
         self.load_image()  # Charger les images
 
@@ -698,7 +698,7 @@ class StereotypingWidget(QWidget):
     def load_image_at_index(self, index):
         """Load the image at the specified index and update UI elements."""
         # Mettre à jour l'index de l'image courante
-        self.current_image_index = index * self.Color_number
+        self.current_image_index = index
         self.viewer.layers.clear()
         self.load_image()
 
@@ -736,7 +736,7 @@ class StereotypingWidget(QWidget):
 
     def next_image(self):
         """Navigate to the next image."""
-        current_group = self.current_image_index // self.Color_number
+        current_group = self.current_image_index
         if current_group + 1 < self.total_images:
             self.update_ui_for_image_change(current_group + 1)
         else:
@@ -745,7 +745,7 @@ class StereotypingWidget(QWidget):
 
     def previous_image(self):
         """Navigate to the previous image."""
-        current_group = self.current_image_index // self.Color_number
+        current_group = self.current_image_index 
         if current_group - 1 >= 0:
             self.update_ui_for_image_change(current_group - 1)
         else:
