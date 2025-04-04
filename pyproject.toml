@@ -1,5 +1,5 @@
 [project]
-name = "napari_stereotypage"
+name = "napari-stereotypage"
 dynamic = ["version"]
 description = "Stereotyping zebrafish embryos by manually setting a reference frame"
 readme = "README.md"
@@ -25,7 +25,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "numpy==1.24.4",
+    "numpy==2.1.0",
     "magicgui==0.9.1",
     "qtpy==2.4.1",
     "scikit-image==0.23.2",
@@ -50,7 +50,7 @@ testing = [
 ]
 
 [project.entry-points."napari.manifest"]
-napari_stereotypage = "napari_stereotypage:napari.yaml"
+napari-stereotypage = "napari_stereotypage:napari.yaml"
 
 
 
