@@ -58,7 +58,7 @@ def initialize_q0():
     return q0
 
 
-def run_douglas_rachford(K, gamma=10, max_iter=1000, tol=1e-8):
+def run_douglas_rachford(K, gamma=10, max_iter=10000, tol=1e-8):
     """Optimisation avec Douglas-Rachford."""
     M = gamma * K + np.eye(10)
     q = initialize_q0()
@@ -72,7 +72,8 @@ def run_douglas_rachford(K, gamma=10, max_iter=1000, tol=1e-8):
         if norm_update < tol:
             print(f"Convergence atteinte à l'itération {iteration}")
             break
-        print(f"Itération {iteration} - Norme de mise à jour : {norm_update}")
+        if iteration % 100 == 0:
+            print(f"Itération {iteration} - Norme de mise à jour : {norm_update}")
     print(f"Solution finale q : {q}")
     return q
 
