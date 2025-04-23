@@ -278,7 +278,7 @@ def orienter_axes(eigvecs, PA, PD, origine):
     cand2 = eigvecs[:, 2].copy()
     d1 = np.dot(cand1, PD - origine)
     d2 = np.dot(cand2, PD - origine)
-    if d1 >= d2:
+    if np.abs(d1) >= np.abs(d2):
         w = cand1 if d1 > 0 else -cand1
     else:
         w = cand2 if d2 > 0 else -cand2
