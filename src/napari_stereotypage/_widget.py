@@ -496,7 +496,7 @@ class StereotypingWidget(QWidget):
 
     def update_instructions(self, num_points):
         instructions = [
-            "Place the apex (anterior part pf the embryo)",
+            "Place the apex (anterior part of the embryo)",
             "Place an embryo's dorsal point.",
             "Place at least 7 more points to fit the ellipsoid.",
             "Place at least 6 more points to fit the ellipsoid.",
