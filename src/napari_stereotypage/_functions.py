@@ -58,7 +58,7 @@ def initialize_q0():
     return q0
 
 
-def run_douglas_rachford(K, gamma=10, max_iter=10000, tol=1e-8):
+def run_douglas_rachford(K, gamma=10, max_iter=50000, tol=1e-8):
     """Optimisation avec Douglas-Rachford."""
     M = gamma * K + np.eye(10)
     q = initialize_q0()
@@ -248,7 +248,7 @@ def visualize_ellipsoid(A, centroid, eigvecs, viewer):
     faces = np.array(faces)
 
     # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
-    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoide", opacity=0.10, blending="additive",
+    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoide", opacity=0.50, blending="additive",
                        colormap="blue")
 
 
@@ -363,42 +363,3 @@ def draw_origin(viewer, origine):
     viewer.add_points([origine], face_color='red', border_color='red', size=5, name='Origine')
 
 
-def visualize_ellipsoid(A, centroid, eigvecs, viewer):
-    """Visualisation de l'ellipsoide dans Napari avec rendu lisse."""
-    # Calculer le facteur d'échelle optimal
-    scale_factor = refine_scale_factor(A, centroid, eigvecs, viewer.layers["Points"].data)
-    eigvals, _ = np.linalg.eigh(A)
-    axes_lengths = np.sqrt(1 / eigvals) * scale_factor  # Appliquer le facteur d'échelle
-
-    # Créer une grille dense pour une meilleure interpolation
-    u = np.linspace(0, 2 * np.pi, 200)  # Augmenter la résolution ici
-    v = np.linspace(0, np.pi, 100)
-    u, v = np.meshgrid(u, v)
-
-    # Points sur une sphère transformée en ellipsoide
-    x = axes_lengths[0] * np.cos(u) * np.sin(v)
-    y = axes_lengths[1] * np.sin(u) * np.sin(v)
-    z = axes_lengths[2] * np.cos(v)
-
-    # Appliquer les transformations pour les axes propres
-    ellipsoid_points = eigvecs @ np.array([x.ravel(), y.ravel(), z.ravel()])
-    x_rot, y_rot, z_rot = ellipsoid_points.reshape(3, x.shape[0], x.shape[1]) + centroid[:, None, None]
-
-    # Conversion en surface
-    vertices = np.column_stack((x_rot.ravel(), y_rot.ravel(), z_rot.ravel()))
-    faces = []
-
-    for i in range(u.shape[0] - 1):
-        for j in range(u.shape[1] - 1):
-            p1 = i * u.shape[1] + j
-            p2 = p1 + u.shape[1]
-            p3 = p1 + 1
-            p4 = p2 + 1
-            faces.append([p1, p2, p3])
-            faces.append([p2, p4, p3])
-
-    faces = np.array(faces)
-
-    # Ajouter la surface dans le viewer avec un rendu lisse et translucide pour voir les points et l'échantillon
-    viewer.add_surface((vertices, faces), shading="smooth", name="Ellipsoide", opacity=0.10, blending="additive",
-                       colormap="blue")
