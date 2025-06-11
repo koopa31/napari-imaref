@@ -259,11 +259,13 @@ class CoordinateTransformationWidget(QWidget):
 
             # Transform centroids
             transformed_centroids = transform_points(centroids, origin, u, v, w)
+            transformed_centroids = transformed_centroids[:, [2, 0, 1]]
 
             # Save the transformed centroids
             output_csv_path = os.path.join(input_folder, base_name + "_cells_coordinates.csv")
-            pd.DataFrame(transformed_centroids, columns=["X_new", "Y_new", "Z_new"]).to_csv(output_csv_path,
-                                                                                            index=False)
+            pd.DataFrame(transformed_centroids, columns=["axis-0", "axis-1", "axis-2"]).to_csv(output_csv_path,
+                                                                                            index=True,
+                                                                                            index_label="index")
 
             print(f"✅ Transformed centroids saved: {output_csv_path}")
 
