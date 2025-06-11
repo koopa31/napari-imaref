@@ -259,7 +259,7 @@ class CoordinateTransformationWidget(QWidget):
 
             # Transform centroids
             transformed_centroids = transform_points(centroids, origin, u, v, w)
-            transformed_centroids = transformed_centroids[:, [2, 0, 1]]
+            transformed_centroids = transformed_centroids[:, [2, 1, 0]]
 
             # Save the transformed centroids
             output_csv_path = os.path.join(input_folder, base_name + "_cells_coordinates.csv")
