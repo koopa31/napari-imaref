@@ -158,6 +158,12 @@ class CoordinateTransformationWidget(QWidget):
             QMessageBox.critical(self, "Error", "The selected folder does not exist.")
             return
 
+        # Ensure the files to analyse exist
+        files = [f for f in os.listdir(input_folder) if self.file_identifier in f]
+        if not files:
+            QMessageBox.critical(self, "Error", "The selected folder does not contain files to analyse.")
+            return
+
         show_info(f"Processing data for {data_type}...")
 
         if data_type == "User Provided Points":
@@ -319,10 +325,10 @@ class CoordinateTransformationWidget(QWidget):
                 df.to_csv(tracks_csv_path, index=False)
                 print(f"✅ Transformed points saved in {tracks_csv_path}")
         else:
-            xml_files = [f for f in files if f.endswith(".xml")]
+            xml_files = [f for f in files if f.endswith(self.file_identifier + ".xml")]
 
             for xml_file in xml_files:
-                base_name = xml_file.replace(".xml", "")
+                base_name = xml_file.replace((self.file_identifier + ".xml"), "")
                 xml_path = os.path.join(input_folder, xml_file)
                 first_image_index = xml_file.split("<")[1].split("-")[0]
                 ref_csv_path = os.path.join(input_folder, xml_file.split("<")[0] + first_image_index + ".csv")
