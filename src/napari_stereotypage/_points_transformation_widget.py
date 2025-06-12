@@ -58,6 +58,9 @@ class CoordinateTransformationWidget(QWidget):
         self.data_type_selection.addItems(["User Provided Points", "Segmentation Mask", "Tracking Result"])
         self.data_type_selection.currentIndexChanged.connect(self.update_tracking_format_visibility)
 
+        # Identifiant des fichiers a traiter
+        self.file_identifier = QLineEdit()
+
         # Format de tracking (désactivé sauf si Tracking Result est sélectionné)
         self.tracking_format_selection = QComboBox()
         self.tracking_format_selection.addItems(["TrackMate (CSV)", "TrackMate (XML)", "Mastodon/Elephant", "Ultrack"])
@@ -77,6 +80,8 @@ class CoordinateTransformationWidget(QWidget):
         layout.addWidget(select_folder_btn)
         layout.addWidget(QLabel("Data format :"))
         layout.addWidget(self.data_type_selection)
+        layout.addWidget(QLabel("File identifier:"))
+        layout.addWidget(self.file_identifier)
         layout.addWidget(QLabel("📊 Format de tracking (si applicable) :"))
         layout.addWidget(self.tracking_format_selection)
         layout.addWidget(self.run_button)
@@ -147,6 +152,7 @@ class CoordinateTransformationWidget(QWidget):
         input_folder = self.folder_path.text()
         data_type = self.data_type_selection.currentText()
         tracking_format = self.tracking_format_selection.currentText()
+        self.file_identifier = self.file_identifier.text()
 
         if not os.path.exists(input_folder):
             QMessageBox.critical(self, "Error", "The selected folder does not exist.")
@@ -183,10 +189,10 @@ class CoordinateTransformationWidget(QWidget):
         - input_folder: Path to the dataset containing point CSVs and reference coordinate CSVs.
         """
         files = os.listdir(input_folder)
-        point_files = [f for f in files if f.endswith("_points.csv")]
+        point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
         for point_file in point_files:
-            base_name = point_file.replace("_points.csv", "")
+            base_name = point_file.replace((self.file_identifier + ".csv"), "")
             points_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
             newpoints_csv_path = os.path.join(input_folder, base_name + "_newpoints.csv")
@@ -235,10 +241,10 @@ class CoordinateTransformationWidget(QWidget):
         """
 
         # Get all segmentation masks in the folder
-        mask_files = [f for f in os.listdir(input_folder) if f.endswith("_mask.tif")]
+        mask_files = [f for f in os.listdir(input_folder) if f.endswith(self.file_identifier + ".tif")]
 
         for mask_file in mask_files:
-            base_name = mask_file.replace("_mask.tif", "")
+            base_name = mask_file.replace((self.file_identifier + ".tif"), "")
             mask_path = os.path.join(input_folder, mask_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
 
@@ -280,10 +286,10 @@ class CoordinateTransformationWidget(QWidget):
         """
         files = os.listdir(input_folder)
         if format == "csv":
-            point_files = [f for f in files if f.endswith("_spots.csv")]
+            point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
             for point_file in point_files:
-                base_name = point_file.replace("_spots.csv", "")
+                base_name = point_file.replace((self.file_identifier + ".csv"), "")
                 tracks_csv_path = os.path.join(input_folder, point_file)
                 ref_csv_path = os.path.join(input_folder, base_name + ".csv")
 
@@ -370,10 +376,10 @@ class CoordinateTransformationWidget(QWidget):
         """
         files = os.listdir(input_folder)
 
-        point_files = [f for f in files if f.endswith("-Spot.csv")]
+        point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
         for point_file in point_files:
-            base_name = point_file.replace("-Spot.csv", "")
+            base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
 
@@ -414,10 +420,10 @@ class CoordinateTransformationWidget(QWidget):
         """
         files = os.listdir(input_folder)
 
-        point_files = [f for f in files if f.endswith("-track.csv")]
+        point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
         for point_file in point_files:
-            base_name = point_file.replace("-track.csv", "")
+            base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
 
