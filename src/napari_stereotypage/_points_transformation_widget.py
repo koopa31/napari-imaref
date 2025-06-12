@@ -59,7 +59,7 @@ class CoordinateTransformationWidget(QWidget):
         self.data_type_selection.currentIndexChanged.connect(self.update_tracking_format_visibility)
 
         # Identifiant des fichiers a traiter
-        self.file_identifier = QLineEdit()
+        self.file_identifier_input = QLineEdit()
 
         # Format de tracking (désactivé sauf si Tracking Result est sélectionné)
         self.tracking_format_selection = QComboBox()
@@ -81,7 +81,7 @@ class CoordinateTransformationWidget(QWidget):
         layout.addWidget(QLabel("Data format :"))
         layout.addWidget(self.data_type_selection)
         layout.addWidget(QLabel("File identifier:"))
-        layout.addWidget(self.file_identifier)
+        layout.addWidget(self.file_identifier_input)
         layout.addWidget(QLabel("📊 Format de tracking (si applicable) :"))
         layout.addWidget(self.tracking_format_selection)
         layout.addWidget(self.run_button)
@@ -152,7 +152,7 @@ class CoordinateTransformationWidget(QWidget):
         input_folder = self.folder_path.text()
         data_type = self.data_type_selection.currentText()
         tracking_format = self.tracking_format_selection.currentText()
-        self.file_identifier = self.file_identifier.text()
+        self.file_identifier = self.file_identifier_input.text()
 
         if not os.path.exists(input_folder):
             QMessageBox.critical(self, "Error", "The selected folder does not exist.")
@@ -197,7 +197,8 @@ class CoordinateTransformationWidget(QWidget):
         files = os.listdir(input_folder)
         point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
-        for point_file in point_files:
+        for index, point_file in enumerate(point_files):
+            self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             points_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
@@ -249,7 +250,8 @@ class CoordinateTransformationWidget(QWidget):
         # Get all segmentation masks in the folder
         mask_files = [f for f in os.listdir(input_folder) if f.endswith(self.file_identifier + ".tif")]
 
-        for mask_file in mask_files:
+        for index, mask_file in enumerate(mask_files):
+            self.progress_bar.setValue(int(100*index/len(mask_files)))
             base_name = mask_file.replace((self.file_identifier + ".tif"), "")
             mask_path = os.path.join(input_folder, mask_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
@@ -294,7 +296,8 @@ class CoordinateTransformationWidget(QWidget):
         if format == "csv":
             point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
-            for point_file in point_files:
+            for index, point_file in enumerate(point_files):
+                self.progress_bar.setValue(int(100*index/len(point_files)))
                 base_name = point_file.replace((self.file_identifier + ".csv"), "")
                 tracks_csv_path = os.path.join(input_folder, point_file)
                 ref_csv_path = os.path.join(input_folder, base_name + ".csv")
@@ -327,7 +330,8 @@ class CoordinateTransformationWidget(QWidget):
         else:
             xml_files = [f for f in files if f.endswith(self.file_identifier + ".xml")]
 
-            for xml_file in xml_files:
+            for index, xml_file in enumerate(xml_files):
+                self.progress_bar.setValue(int(100*index/len(xml_files)))
                 base_name = xml_file.replace((self.file_identifier + ".xml"), "")
                 xml_path = os.path.join(input_folder, xml_file)
                 first_image_index = xml_file.split("<")[1].split("-")[0]
@@ -384,7 +388,8 @@ class CoordinateTransformationWidget(QWidget):
 
         point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
-        for point_file in point_files:
+        for index, point_file in enumerate(point_files):
+            self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
@@ -428,7 +433,8 @@ class CoordinateTransformationWidget(QWidget):
 
         point_files = [f for f in files if f.endswith(self.file_identifier + ".csv")]
 
-        for point_file in point_files:
+        for index, point_file in enumerate(point_files):
+            self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
             ref_csv_path = os.path.join(input_folder, base_name + ".csv")
