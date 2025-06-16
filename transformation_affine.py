@@ -90,21 +90,44 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, output_shape=None,
     """
 
     R_inv = np.linalg.inv(R_zyx)
-    desired_center_zyx = np.array(new_center)
-    offset = desired_center_zyx - R_inv @ origin_zyx
+
+    # Compute bounding box of transformed image
+    z, y, x = image_local.shape
+    corners = np.array([
+        [0, 0, 0],
+        [0, 0, x - 1],
+        [0, y - 1, 0],
+        [0, y - 1, x - 1],
+        [z - 1, 0, 0],
+        [z - 1, 0, x - 1],
+        [z - 1, y - 1, 0],
+        [z - 1, y - 1, x - 1],
+    ])
+
+    transformed_corners = corners @ R_inv.T - R_inv @ origin_zyx
+    min_coord = np.floor(transformed_corners.min(axis=0)).astype(int)
+    max_coord = np.ceil(transformed_corners.max(axis=0)).astype(int)
+    output_shape_auto = tuple((max_coord - min_coord).tolist())
 
     if output_shape is None:
-        output_shape = image_local.shape
+        output_shape = output_shape_auto
+
+    offset = -R_inv @ origin_zyx - min_coord
+
+    print("Offset:", offset)
+    print("Output shape:", output_shape)
+    print("Transformed Z range:", [min_coord[0], max_coord[0]])
 
     image_global = affine_transform(
         image_local,
         R_inv,
         offset=offset,
-        output_shape=tuple((2 * 300,) * 3),
+        output_shape=output_shape,
         order=order,
         mode='constant',
         cval=0.0
     )
+
     return image_global
 
 # === 3. Main ===
