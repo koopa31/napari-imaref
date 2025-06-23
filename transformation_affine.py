@@ -107,11 +107,12 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, out
                               centered at `new_center`.
     """
 
-    R_inv = np.linalg.inv(R_zyx)
-    offset = -R_inv @ origin_zyx - min_coord_ref
+    #R_inv = np.linalg.inv(R_zyx)
+    #offset = -R_inv @ origin_zyx - min_coord_ref
+    offset = origin_zyx + R_zyx @ (R_zyx @ min_coord_ref)
     registered_image = affine_transform(
         image_local,
-        R_inv,
+        R_zyx,
         offset=offset,
         output_shape=output_shape,
         order=order,
@@ -122,20 +123,20 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, out
 
 # === 3. Main ===
 #image_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.tif"
-image_path = "/home/clement/Images/caracterisation_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
+image_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
 #csv_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.csv"
-csv_path = "/home/clement/Images/caracterisation_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
+csv_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
 
 image_local = imread(image_path)
 origin, u, v, w = read_frame_csv(csv_path)
 R = np.stack([w, v, u], axis=1)
 #image_global = transform_image_to_global(image_local, R, origin)
 
-R_inv_ref = np.linalg.inv(R)
+R_inv_ref = R.T
 min_coord_ref, max_coord_ref = compute_transformed_bbox(image_local.shape, R_inv_ref, origin)
 output_shape = tuple((max_coord_ref - min_coord_ref).tolist())
 
-image_global = transform_image_to_global(image_local, R, origin, min_coord_ref, output_shape, order=5)
+image_global = transform_image_to_global(image_local, R, origin, min_coord_ref, output_shape, order=0)
 
 
 
