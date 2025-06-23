@@ -12,9 +12,10 @@ It:
 
 
 import numpy as np
-from tifffile import imread
+from skimage.io import imsave, imread
 from scipy.ndimage import affine_transform
 import napari
+from pathlib import Path
 import re
 
 # === 1. Parseur CSV ===
@@ -66,8 +67,25 @@ def read_frame_csv(csv_path):
     w = parse_vector(matches[3])
     return origin, u, v, w
 
+def compute_transformed_bbox(shape, R_inv, origin_zyx):
+    z, y, x = shape
+    corners = np.array([
+        [0, 0, 0],
+        [0, 0, x-1],
+        [0, y-1, 0],
+        [0, y-1, x-1],
+        [z-1, 0, 0],
+        [z-1, 0, x-1],
+        [z-1, y-1, 0],
+        [z-1, y-1, x-1],
+    ])
+    transformed = corners @ R_inv.T - R_inv @ origin_zyx
+    min_coord = np.floor(transformed.min(axis=0)).astype(int)
+    max_coord = np.ceil(transformed.max(axis=0)).astype(int)
+    return min_coord, max_coord
+
 # === 2. Transformation vers le repère image ===
-def transform_image_to_global(image_local, R_zyx, origin_zyx, output_shape=None, new_center=(300, 300, 300), order=5):
+def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, output_shape=None, order=5):
     """
     Applies an affine transformation to reproject a 3D image from a local coordinate system
     (e.g., defined by a fitted ellipsoid) back into the global image coordinate space. This enables to register several
@@ -90,35 +108,8 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, output_shape=None,
     """
 
     R_inv = np.linalg.inv(R_zyx)
-
-    # Compute bounding box of transformed image
-    z, y, x = image_local.shape
-    corners = np.array([
-        [0, 0, 0],
-        [0, 0, x - 1],
-        [0, y - 1, 0],
-        [0, y - 1, x - 1],
-        [z - 1, 0, 0],
-        [z - 1, 0, x - 1],
-        [z - 1, y - 1, 0],
-        [z - 1, y - 1, x - 1],
-    ])
-
-    transformed_corners = corners @ R_inv.T - R_inv @ origin_zyx
-    min_coord = np.floor(transformed_corners.min(axis=0)).astype(int)
-    max_coord = np.ceil(transformed_corners.max(axis=0)).astype(int)
-    output_shape_auto = tuple((max_coord - min_coord).tolist())
-
-    if output_shape is None:
-        output_shape = output_shape_auto
-
-    offset = -R_inv @ origin_zyx - min_coord
-
-    print("Offset:", offset)
-    print("Output shape:", output_shape)
-    print("Transformed Z range:", [min_coord[0], max_coord[0]])
-
-    image_global = affine_transform(
+    offset = -R_inv @ origin_zyx - min_coord_ref
+    registered_image = affine_transform(
         image_local,
         R_inv,
         offset=offset,
@@ -127,22 +118,111 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, output_shape=None,
         mode='constant',
         cval=0.0
     )
-
-    return image_global
+    return registered_image
 
 # === 3. Main ===
-image_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.tif"
-csv_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.csv"
+#image_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.tif"
+image_path = "/home/clement/Images/caracterisation_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
+#csv_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.csv"
+csv_path = "/home/clement/Images/caracterisation_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
 
 image_local = imread(image_path)
 origin, u, v, w = read_frame_csv(csv_path)
 R = np.stack([w, v, u], axis=1)
-image_global = transform_image_to_global(image_local, R, origin)
+#image_global = transform_image_to_global(image_local, R, origin)
+
+R_inv_ref = np.linalg.inv(R)
+min_coord_ref, max_coord_ref = compute_transformed_bbox(image_local.shape, R_inv_ref, origin)
+output_shape = tuple((max_coord_ref - min_coord_ref).tolist())
+
+image_global = transform_image_to_global(image_local, R, origin, min_coord_ref, output_shape, order=5)
+
+
 
 # === 4. Visualisation Napari ===
 viewer = napari.Viewer()
 viewer.add_image(image_local, name='repère local')
 viewer.add_image(image_global, name='repère image')
-viewer.add_points([origin[::-1]], size=6, name='origine (global)', face_color='red')
+viewer.add_points([origin], size=6, name='origine (global)', face_color='red')
+
+segment_u = np.array([origin, origin + 50 * u])
+viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue', name='Axe X')
+
+# Dessine l'axe y
+segment_v = np.array([origin, origin + 50 * v])
+viewer.add_shapes(segment_v, shape_type='line', edge_width=1, edge_color='red', name='Axe Y')
+
+# Dessine l'axe z
+segment_w = np.array([origin, origin + 50 * w])
+viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green', name='Axe Z')
+
+viewer.dims.ndisplay = 3
 napari.run()
+
+
+"""
+# === Traitement de tout un dossier ===
+input_dir = Path("/home/clement/Images/caracterisation_16hpf")
+images = sorted([
+    f for ext in ("*.tif", "*.TIF")
+    for f in input_dir.glob(ext)
+    if "_cp_masks" not in f.stem
+])
+csvs = sorted(input_dir.glob("*.csv"))
+
+# Affichage de debug
+print("Images trouvées :", [img.name for img in images])
+print("CSVs trouvés :", [csv.name for csv in csvs])
+
+# Associer chaque image avec son masque et son CSV
+image_csv_mask_triplets = []
+for img in images:
+    if "_cp_masks_clean" in img.stem:
+        continue
+    base_name = img.stem
+    mask_path = input_dir / f"{base_name}_cp_masks_clean.tif"
+    csv_path = input_dir / f"{base_name}.csv"
+    if mask_path.exists() and csv_path.exists():
+        image_csv_mask_triplets.append((img, mask_path, csv_path))
+    else:
+        print(f"[WARNING] Fichiers manquants pour {base_name}:")
+        if not mask_path.exists():
+            print("  - Masque manquant :", mask_path.name)
+        if not csv_path.exists():
+            print("  - CSV manquant :", csv_path.name)
+
+print(f"Nombre de triplets valides trouvés : {len(image_csv_mask_triplets)}")
+
+if image_csv_mask_triplets:
+    # Utiliser la première image comme référence pour le min_coord commun
+    ref_img_path, ref_mask_path, ref_csv_path = image_csv_mask_triplets[0]
+    ref_image = imread(ref_img_path)
+    ref_origin, ref_u, ref_v, ref_w = read_frame_csv(ref_csv_path)
+    R_ref = np.stack([ref_w, ref_v, ref_u], axis=1)
+    R_inv_ref = np.linalg.inv(R_ref)
+    min_coord_ref, max_coord_ref = compute_transformed_bbox(ref_image.shape, R_inv_ref, ref_origin)
+    output_shape = tuple((max_coord_ref - min_coord_ref).tolist())
+
+    # Dossier de sortie
+    output_dir = input_dir / "registered"
+    output_dir.mkdir(exist_ok=True)
+
+    # Traitement de tous les fichiers
+    for img_path, mask_path, csv_path in image_csv_mask_triplets:
+        image = imread(img_path)
+        mask = imread(mask_path)
+        origin, u, v, w = read_frame_csv(csv_path)
+        R = np.stack([w, v, u], axis=1)
+
+        image_registered = transform_image_to_global(image, R, origin, min_coord_ref, output_shape, order=0)
+        mask_registered = transform_image_to_global(mask, R, origin, min_coord_ref, output_shape, order=0)
+
+        imsave(output_dir / f"{img_path.stem}_registered.tif", image_registered.astype(np.uint16))
+        imsave(output_dir / f"{mask_path.stem}_registered.tif", mask_registered.astype(np.uint16))
+
+    print(f"✅ {len(image_csv_mask_triplets)} images et masques enregistrés dans : {output_dir}")
+else:
+    print("❌ Aucun triplet image/masque/csv valide trouvé.")
+
+"""
 
