@@ -107,9 +107,20 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, out
                               centered at `new_center`.
     """
 
+    if output_shape==None:
+        output_shape_vec = np.asarray(image_local.shape)
+    else:
+        output_shape_vec = np.asarray(output_shape)
     #R_inv = np.linalg.inv(R_zyx)
     #offset = -R_inv @ origin_zyx - min_coord_ref
-    offset = origin_zyx + R_zyx @ (R_zyx @ min_coord_ref)
+    offset = origin_zyx - R_zyx @ (output_shape_vec/2 - R_zyx.T @ (np.asarray(image_local.shape)/2- origin_zyx))
+    # Explications de offset:
+    # - origin_zyx décale l'image pour placer le centre de la rotation à l'origine du repère
+    # - Le terme R_zyx @ (vecteur) correspond à un décalage après la transformation de vecteur
+    # - si vecteur = output_shape_vec/2, on place le centre de rotation au centre de l'image
+    # - avec dans vecteur le terme  - R_zyx.T @ (np.asarray(image_local)/2- origin_zyx), on translate
+    # l'image du vecteur OC ou O est le centre de rotation et C et le centre de l'image après transformation
+    # ce faisant, on place l'ancien centre de l'image au centre de la nouvelle image
     registered_image = affine_transform(
         image_local,
         R_zyx,
@@ -123,9 +134,11 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, out
 
 # === 3. Main ===
 #image_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.tif"
-image_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
+# image_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
+image_path = "/Users/dsanchez/Downloads/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
 #csv_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.csv"
-csv_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
+# csv_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
+csv_path = "/Users/dsanchez/Downloads/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
 
 image_local = imread(image_path)
 origin, u, v, w = read_frame_csv(csv_path)
