@@ -132,13 +132,15 @@ def transform_image_to_global(image_local, R_zyx, origin_zyx, min_coord_ref, out
     )
     return registered_image
 
+"""
 # === 3. Main ===
 #image_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.tif"
 # image_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
-image_path = "/Users/dsanchez/Downloads/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.TIF"
+image_path = "B:/Data Analysis/MorphoParameters/20250529_84mKate_84nlsEOS_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s6_cp_masks_clean.TIF"
 #csv_path = "/home/clement/Images/Image_ellipse/20250131_cldnGFP_84nlsEOS_postPhotoconversion.lif - E5 - C=0.csv"
 # csv_path = "/home/clement/Images/caracterisation_16hpf/test/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
-csv_path = "/Users/dsanchez/Downloads/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s1.csv"
+csv_path = "B:/Data Analysis/MorphoParameters/20250529_84mKate_84nlsEOS_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s6.csv"
+output_path = "B:/Data Analysis/MorphoParameters/20250529_84mKate_84nlsEOS_16hpf/20250529_OmpYFP_84mKate_84nlsEOS_O40_02u_100u_16hpf_w1CSU-561 Em 593LP_s6_cp_masks_clean_imaref.TIF"
 
 image_local = imread(image_path)
 origin, u, v, w = read_frame_csv(csv_path)
@@ -151,6 +153,16 @@ output_shape = tuple((max_coord_ref - min_coord_ref).tolist())
 
 image_global = transform_image_to_global(image_local, R, origin, min_coord_ref, output_shape, order=0)
 
+
+
+# === 4.0 Image save ====
+image_global_cropped = image_global.crop()
+if image_global.dtype == np.float64:
+    image_to_save = image_global.astype(np.float32)
+else:
+    image_to_save = image_global
+
+imsave(str(output_path), image_to_save)
 
 
 # === 4. Visualisation Napari ===
@@ -172,10 +184,11 @@ viewer.add_shapes(segment_w, shape_type='line', edge_width=1, edge_color='green'
 
 viewer.dims.ndisplay = 3
 napari.run()
-
-
 """
-# === Traitement de tout un dossier ===
+
+
+# === Traitement de tout un dossier === 
+
 input_dir = Path("/home/clement/Images/caracterisation_16hpf")
 images = sorted([
     f for ext in ("*.tif", "*.TIF")
@@ -191,10 +204,10 @@ print("CSVs trouvés :", [csv.name for csv in csvs])
 # Associer chaque image avec son masque et son CSV
 image_csv_mask_triplets = []
 for img in images:
-    if "_cp_masks_clean" in img.stem:
+    if "_cp_masks_filtered" in img.stem:
         continue
     base_name = img.stem
-    mask_path = input_dir / f"{base_name}_cp_masks_clean.tif"
+    mask_path = input_dir / f"{base_name}_cp_masks_filtered.tif"
     csv_path = input_dir / f"{base_name}.csv"
     if mask_path.exists() and csv_path.exists():
         image_csv_mask_triplets.append((img, mask_path, csv_path))
@@ -214,7 +227,9 @@ if image_csv_mask_triplets:
     ref_origin, ref_u, ref_v, ref_w = read_frame_csv(ref_csv_path)
     R_ref = np.stack([ref_w, ref_v, ref_u], axis=1)
     R_inv_ref = np.linalg.inv(R_ref)
-    min_coord_ref, max_coord_ref = compute_transformed_bbox(ref_image.shape, R_inv_ref, ref_origin)
+    # min_coord_ref, max_coord_ref = compute_transformed_bbox(ref_image.shape, R_inv_ref, ref_origin)
+    max_coord_ref = np.array([ 631,  683, 1028])
+    min_coord_ref = np.array([-643, -580, -583])
     output_shape = tuple((max_coord_ref - min_coord_ref).tolist())
 
     # Dossier de sortie
@@ -234,9 +249,17 @@ if image_csv_mask_triplets:
         imsave(output_dir / f"{img_path.stem}_registered.tif", image_registered.astype(np.uint16))
         imsave(output_dir / f"{mask_path.stem}_registered.tif", mask_registered.astype(np.uint16))
 
+        x_start, x_end = 250, 1102  
+        y_start, y_end = 172, 1014  
+        z_start, z_end = 431, 900
+        image_registered = image_registered[z_start:z_end, y_start:y_end, x_start:x_end]
+        mask_registered = mask_registered[z_start:z_end, y_start:y_end, x_start:x_end]
+        imsave(output_dir / f"{img_path.stem}_registered_cropped.tif", image_registered.astype(np.uint16))
+        imsave(output_dir / f"{mask_path.stem}_registered_cropped.tif", mask_registered.astype(np.uint16))
+
     print(f"✅ {len(image_csv_mask_triplets)} images et masques enregistrés dans : {output_dir}")
 else:
     print("❌ Aucun triplet image/masque/csv valide trouvé.")
 
-"""
+
 
