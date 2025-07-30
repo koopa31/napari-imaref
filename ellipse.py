@@ -5,6 +5,7 @@ import argparse
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from joblib import Parallel, delayed
+import pandas as pd
 
 plt.rcParams.update({
     'axes.titlesize': 20,       # Taille du titre
@@ -67,7 +68,7 @@ def initialize_q0():
     return q0
 
 
-def run_douglas_rachford(K, gamma=10, max_iter=1000, tol=1e-8):
+def run_douglas_rachford(K, gamma=10, max_iter=50000, tol=1e-8):
     """Optimisation avec Douglas-Rachford."""
     M = gamma * K + np.eye(10)
     q = initialize_q0()
@@ -832,14 +833,37 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
     ]
     µm_std_values = [x * voxel_size[1] for x in std_values]
     plt.figure(figsize=(8, 5))
-    plt.boxplot(centroid_errors_um, labels=[f"{x:.1f}" for x in µm_std_values])
+    positions = list(range(1, len(µm_std_values) + 1))
+    parts = plt.violinplot(centroid_errors_um, positions=positions, widths=0.7, showmedians=True, showextrema=False)
+
+    # Appliquer les couleurs (rose, orange, bleu, violet)
+    colors = ['#FF99CC', '#ED7D31', '#008080', '#9900CC']
+    for pc, color in zip(parts['bodies'], colors):
+        pc.set_facecolor(color)
+        pc.set_alpha(0.7)
+
+    # Ajout des labels sous les violons
+    plt.xticks(positions, [f"{x:.1f}" for x in µm_std_values])
+
     plt.xlabel("Positioning error (µm)")
     plt.ylabel("Displacement of the origin of \n the reference frame (µm)")
-    plt.title("Impact of positioning error on origin position (µm)")
+    #plt.title("Impact of positioning error on origin position (µm)")
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("fig1_1.svg", format="svg", bbox_inches="tight")
     plt.show()
+
+    # Sauvegarde des données dans un csv
+    fig1_1_data = []
+    for std in std_values:
+        displacements = np.linalg.norm((np.array(results[std]["centroids"]) - original_centroid) * voxel_size, axis=1)
+        for i, d in enumerate(displacements):
+            fig1_1_data.append({
+                "std_um": std * voxel_size[1],
+                "simulation": i,
+                "displacement_um": d
+            })
+    pd.DataFrame(fig1_1_data).to_csv("fig1_1_displacement_origin.csv", index=False)
 
     # 📌 Déviation des longueurs d'axes (X, Y, Z)
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -888,36 +912,52 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
 
     # Noms des axes
     axis_labels = ["Axe Z", "Axe Y", "Axe X"]
-
-    # Liste de couleurs pour chaque std
-    colors = plt.cm.plasma(np.linspace(0, 1, len(std_values)))
-
-    # Définition des positions X pour chaque axe (Z=1, Y=2, X=3)
     x_positions = np.array([1, 2, 3])
+    custom_colors = ['#FF99CC', '#ED7D31', '#008080', '#9900CC']
 
     for i, std in enumerate(std_values):
-        # Assurer que chaque élément est bien de taille (N, 3)
+        # Extraire les données pour chaque axe
         data = [np.array(results[std]["angles_deviation"]).squeeze()[:, j] for j in range(3)]
 
-        # Ajout du boxplot avec un léger décalage horizontal
-        ax.boxplot(data, positions=x_positions + (i - len(std_values) / 2) * 0.1, widths=0.08,
-                   patch_artist=True, boxprops=dict(facecolor=colors[i], alpha=0.7))
+        # Positionnement horizontal décalé
+        shifted_positions = x_positions + (i - len(std_values) / 2) * 0.1
 
-    # Mise en forme du graphique
+        # Violinplot pour chaque axe
+        vp = ax.violinplot(data, positions=shifted_positions, widths=0.08, showmedians=True, showextrema=False)
+
+        # Appliquer la couleur
+        for body in vp['bodies']:
+            body.set_facecolor(custom_colors[i])
+            body.set_alpha(0.7)
+
     ax.set_xticks(x_positions)
     ax.set_xticklabels(axis_labels)
     ax.set_xlabel("Main axes of the ellipsoid")
     ax.set_ylabel("Angular deviation (°)")
-    ax.set_title("Impact of the positioning error on axes orientation")
+    #ax.set_title("Impact of the positioning error on axes orientation")
 
-    # Légende des couleurs (STD values)
-    handles = [plt.Line2D([0], [0], color=colors[i], lw=4, label=f"{µm_std_values[i]:.1f} µm")
+    # Légende
+    handles = [plt.Line2D([0], [0], color=custom_colors[i], lw=4, label=f"{µm_std_values[i]:.1f} µm")
                for i in range(len(std_values))]
     ax.legend(handles=handles, title="Positioning error (µm)")
 
     ax.grid(True)
-    plt.savefig("fig1_3.svg", format="svg", bbox_inches="tight")
+    plt.savefig("fig1_3_violin.svg", format="svg", bbox_inches="tight")
     plt.show()
+
+    # Sauvegarde des données dans un csv
+    fig1_3_data = []
+    for std in std_values:
+        angles_array = np.array(results[std]["angles_deviation"])
+        for i, angles in enumerate(angles_array):
+            for j, name in enumerate(["Z", "Y", "X"]):
+                fig1_3_data.append({
+                    "std_um": std * voxel_size[1],
+                    "simulation": i,
+                    "axis": name,
+                    "angle_deg": angles[j]
+                })
+    pd.DataFrame(fig1_3_data).to_csv("fig1_3_angular_deviation.csv", index=False)
 
     # 🔹 Calcul des distances du point fixé dans les repères perturbés
     distances, reference_coords, perturbed_coords_per_std = compute_point_distances_in_perturbed_references(
@@ -926,14 +966,39 @@ def analyze_results_multiple_std(original_centroid, u, v, w, original_axes, resu
 
     # 📌 Boxplot des distances du point dans les repères perturbés
     plt.figure(figsize=(8, 5))
-    plt.boxplot(distances, tick_labels=[f"{x:.1f}" for x in µm_std_values])
+    positions = list(range(1, len(µm_std_values) + 1))
+
+    # Créer le violinplot
+    parts = plt.violinplot(distances, positions=positions, widths=0.7, showmedians=True, showextrema=False)
+
+    # Appliquer les mêmes couleurs que dans la figure de référence
+    colors = ['#FF99CC', '#ED7D31', '#008080', '#9900CC']
+    for pc, color in zip(parts['bodies'], colors):
+        pc.set_facecolor(color)
+        pc.set_alpha(0.7)
+
+    # Ajouter les labels d’axe X
+    plt.xticks(positions, [f"{x:.1f}" for x in µm_std_values])
+
+    # Légendes et mise en forme
     plt.xlabel("Positioning error (µm)")
     plt.ylabel("Distance from set point (µm)")
-    plt.title("Impact of positioning error on the reference point \n location in disturbed reference frames")
+    #plt.title("Impact of positioning error on the reference point \n location in disturbed reference frames")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("fig1_4.svg", format="svg", bbox_inches="tight")
+    plt.savefig("fig1_4_violin.svg", format="svg", bbox_inches="tight")
     plt.show()
+
+    # Sauvegarde des données dans un csv
+    fig1_4_data = []
+    for i, std in enumerate(std_values):
+        for j, d in enumerate(distances[i]):
+            fig1_4_data.append({
+                "std_um": std * voxel_size[1],
+                "simulation": j,
+                "distance_um": d
+            })
+    pd.DataFrame(fig1_4_data).to_csv("fig1_4_reference_point_distance.csv", index=False)
 
     # 📌 Visualisation 3D des perturbations pour chaque std
     # Pour chaque valeur de bruit (std) :
@@ -1224,7 +1289,7 @@ def parallel_test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, 
 
 
 def analyze_results_subset(subset_results, original_centroid, original_axes, voxel_size, u, v, w, reference_point,
-                           m_noise_simulations):
+                           m_noise_simulations, points):
     """
     Analyse l'impact combiné du nombre de points et du bruit sur la stabilité des résultats.
 
@@ -1237,7 +1302,7 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
     subset_ratios = sorted(subset_results.keys())
     std_values = sorted(subset_results[subset_ratios[0]].keys())
 
-    colors = plt.cm.plasma(np.linspace(0, 1, len(std_values)))
+    colors = ['#FF99CC', '#ED7D31', '#008080', '#9900CC']
 
     # 📌 Déviation du centroïde en µm (moyenne des moyennes)
     plt.figure(figsize=(8, 5))
@@ -1258,11 +1323,27 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
 
     plt.xlabel("Total points used")
     plt.ylabel("Mean displacement of the origin (µm)")
-    plt.title("Impact of point count and noise on origin displacement")
+    #plt.title("Impact of point count and noise on origin displacement")
     plt.legend(title="Positioning error (µm)")
     plt.grid(True)
     plt.savefig("fig2_1.svg", format="svg", bbox_inches="tight")
     plt.show()
+
+    # Sauvegarde des données dans un csv
+    fig2_1_data = []
+    for i, std in enumerate(std_values):
+        for r in subset_ratios:
+            n_points = int(r * points.shape[0])
+            centroids = subset_results[r][std]["centroids"]
+            for rep in centroids:
+                for c in rep:
+                    d = np.linalg.norm((np.array(c) - original_centroid) * voxel_size)
+                    fig2_1_data.append({
+                        "std_um": std * voxel_size[1],
+                        "n_points": n_points,
+                        "displacement_um": d
+                    })
+    pd.DataFrame(fig2_1_data).to_csv("fig2_1_displacement_vs_point_count.csv", index=False)
 
     # 📌 Déviation angulaire moyenne des axes (Z, Y, X) en fonction du nombre de points
     fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)  # Trois graphes, même échelle en Y
@@ -1301,7 +1382,7 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
 
         ax.set_xlabel("Total points used")
         ax.set_ylabel("Mean angular deviation (°)")
-        ax.set_title(f"Impact of point count and noise on {axis_labels[axis]}")
+        #ax.set_title(f"Impact of point count and noise on {axis_labels[axis]}")
         ax.legend(title="Positioning error (µm)")
         ax.grid(True)
         ax.set_ylim(y_min, y_max)  # Assurer une échelle commune en Y
@@ -1309,6 +1390,23 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
     plt.tight_layout()
     plt.savefig("fig2_2.svg", format="svg", bbox_inches="tight")
     plt.show()
+
+    # Sauvegarde des données dans un csv
+    fig2_2_data = []
+    for i, std in enumerate(std_values):
+        for r in subset_ratios:
+            n_points = int(r * points.shape[0])
+            angles_per_subset = subset_results[r][std]["angles_deviation"]
+            for subset_angles in angles_per_subset:
+                for sim_angles in subset_angles:
+                    for j, axis in enumerate(["Z", "Y", "X"]):
+                        fig2_2_data.append({
+                            "std_um": std * voxel_size[1],
+                            "n_points": n_points,
+                            "axis": axis,
+                            "angle_deg": sim_angles[j]
+                        })
+    pd.DataFrame(fig2_2_data).to_csv("fig2_2_angular_deviation_vs_point_count.csv", index=False)
 
     for i, std in enumerate(std_values):
         mean_distances = []
@@ -1345,13 +1443,34 @@ def analyze_results_subset(subset_results, original_centroid, original_axes, vox
 
     plt.xlabel("Total points used")
     plt.ylabel("Mean distance from reference \n point (µm)")
-    plt.title("Impact of point count and noise \n on the reference point location")
+    #plt.title("Impact of point count and noise \n on the reference point location")
     plt.legend(title="Positioning error (µm)")
     plt.grid(True)
     plt.tight_layout()
     plt.savefig("fig2_3.svg", format="svg", bbox_inches="tight")
     plt.show()
 
+    # Sauvegarde des données dans un csv
+    fig2_3_data = []
+    for i, std in enumerate(std_values):
+        for r in subset_ratios:
+            n_points = int(r * points.shape[0])
+            std_results = subset_results[r][std]
+            for subset_i in range(len(std_results["centroids"])):
+                for j in range(len(std_results["centroids"][subset_i])):
+                    centroid = std_results["centroids"][subset_i][j]
+                    u_ = std_results["orientations"][subset_i][j][:, 0]
+                    v_ = std_results["orientations"][subset_i][j][:, 1]
+                    w_ = std_results["orientations"][subset_i][j][:, 2]
+                    pert_coords = transformer_coordonnees(reference_point, centroid, u_, v_, w_)
+                    ref_coords = transformer_coordonnees(reference_point, original_centroid, u, v, w)
+                    dist = np.linalg.norm((pert_coords - ref_coords) * voxel_size)
+                    fig2_3_data.append({
+                        "std_um": std * voxel_size[1],
+                        "n_points": n_points,
+                        "distance_um": dist
+                    })
+    pd.DataFrame(fig2_3_data).to_csv("fig2_3_reference_point_distance_vs_point_count.csv", index=False)
 
 ### END OF SENSITIVITY ANALYSIS ###
 
@@ -1544,7 +1663,7 @@ def main():
                                                       voxel_size=voxel_size)
 
     analyze_results_subset(subset_results, centroid, np.sqrt(1 / eigvals), voxel_size, u, v, w, reference_point,
-                           m_noise_simulations=noise_simulations)
+                           m_noise_simulations=noise_simulations, points=points)
     print("temps de calcul: ", time.time() - start)
 
     # Ajout du point d'origine (centroïde)
