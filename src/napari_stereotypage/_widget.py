@@ -236,6 +236,13 @@ class StereotypingWidget(QWidget):
         self.dorsal_points_checkbox.stateChanged.connect(self.toggle_dorsal_points)
         computation_layout.addWidget(self.dorsal_points_checkbox)
 
+        self.invert_x_checkbox = QCheckBox("Invert X-vector direction (optional)")
+        self.invert_x_checkbox.setToolTip(
+            "Check this box if your microscope produces mirror images, causing the left placode to appear on the right "
+            "and vice versa. This will invert the direction of the X-axis vector accordingly without affecting Y and Z.")
+        self.invert_x_checkbox.stateChanged.connect(self.invert_x)
+        computation_layout.addWidget(self.invert_x_checkbox)
+
         # On afficher toujours l'ellipsoide et les axes mtn
         """self.show_axes_checkbox = QCheckBox("Show computed orthonormal axes")
         self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
@@ -351,6 +358,15 @@ class StereotypingWidget(QWidget):
         self.update_instructions(0)
 
         check_for_update(plugin_name="napari-stereotypage", viewer=self.viewer)
+
+    def invert_x(self):
+        if hasattr(self, 'u'):
+            self.u = -self.u  # inversion du vecteur X
+            draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
+            save_data_to_csv(
+                self.image_paths[self.current_image_index * self.Color_number],
+                (self.nouvelle_origine, self.u, self.v, self.w)
+            )
 
     def toggle_dorsal_points(self, state):
         if state == Qt.Checked:
