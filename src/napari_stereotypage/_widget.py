@@ -228,6 +228,11 @@ class StereotypingWidget(QWidget):
         calculer_coords_button.clicked.connect(self.calculate_new_coordinates)
         computation_layout.addWidget(calculer_coords_button)
 
+        self.dorsal_points_checkbox = QCheckBox("Add dorsal points to orient Z-vector (optional)")
+        self.dorsal_points_checkbox.setToolTip("Add aligned dorsal points to help set Z-vector orientation, then click 'Calculate coordinates' to recompute")
+        self.dorsal_points_checkbox.stateChanged.connect(self.toggle_dorsal_points)
+        computation_layout.addWidget(self.dorsal_points_checkbox)
+
         self.show_axes_checkbox = QCheckBox("Show computed orthonormal axes")
         self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
         computation_layout.addWidget(self.show_axes_checkbox)
@@ -342,6 +347,24 @@ class StereotypingWidget(QWidget):
         self.update_instructions(0)
 
         check_for_update(plugin_name="napari-stereotypage", viewer=self.viewer)
+
+    def toggle_dorsal_points(self, state):
+        if state == Qt.Checked:
+            self.add_dorsal_points_layer()
+        else:
+            self.remove_dorsal_points_layer()
+
+
+    def add_dorsal_points_layer(self):
+        dorsal_pts_layer = self.viewer.add_points(name="DorsalPoints", ndim=3)
+        dorsal_pts_layer.mode = "add"
+        self.viewer.dims.ndisplay = 2
+        self.viewer.layers.selection.active = dorsal_pts_layer
+
+
+    def remove_dorsal_points_layer(self):
+        if "DorsalPoints" in self.viewer.layers:
+            self.viewer.layers.remove("DorsalPoints")
 
     def on_display_change(self, event):
         """
@@ -559,10 +582,79 @@ class StereotypingWidget(QWidget):
             layer.data = []
 
 
+    def adjust_Z_in_plane(self, O, Y, Z0, points):
+        """
+        Reorient Z-vector in case it is not well fitted enough by adding points in the dorsal plane to define
+        a plane it must be contained in.
+        :param O: Origin of the orthonormal frame.
+        :param Y: Y vector pointing towards the Anterior point.
+        :param Z0: Z vector to be adusted
+        :param points: Set of points which define the right direction for Z.
+        :return: new tuple for (X, Y, Z) vectors.
+        """
+        if hasattr(points, 'data'):
+            points = points.data
+
+        Y = Y / np.linalg.norm(Y)
+        Z0 = Z0 / np.linalg.norm(Z0)
+
+        # On cherche le plan passant par O et contenant Y et une direction w (⊥ Y)
+        # Pour ce faire, on cherche le vecteur w (⊥ Y) qui minimise la distance au nuage
+        # Méthode : trouver le plan contenant Y et qui a une normale N minimisant les distances
+
+        # Centrer les points
+        delta = points - O
+
+        # Générer base complète (Y, B1, B2) : B1, B2 dans plan orthogonal à Y
+        # Par défaut, on utilise Z0 pour construire B1 (orthogonal à Y)
+        B1 = Z0 - (Z0 @ Y) * Y
+        if np.linalg.norm(B1) < 1e-8:
+            B1 = np.array([1, 0, 0]) if abs(Y[0]) < 0.9 else np.array([0, 1, 0])
+            B1 = B1 - (B1 @ Y) * Y
+        B1 /= np.linalg.norm(B1)
+        B2 = np.cross(Y, B1)
+
+        # On cherche une direction dans le plan orthogonal à Y :
+        # direction = cos(θ) * B1 + sin(θ) * B2
+
+        best_theta = None
+        min_total_distance = np.inf
+        best_dir = None
+
+        for theta in np.linspace(0, 2 * np.pi, 360):
+            w = np.cos(theta) * B1 + np.sin(theta) * B2
+            # Le plan est span(Y, w), on peut obtenir sa normale :
+            N = np.cross(Y, w)
+            N = N / np.linalg.norm(N)
+
+            # Calcul de la distance orthogonale de chaque point au plan
+            distances = np.abs(delta @ N)
+            total = np.mean(distances)
+
+            if total < min_total_distance:
+                min_total_distance = total
+                best_theta = theta
+                best_dir = w
+
+        # Maintenant on a la meilleure direction w ⇒ plan optimal = span(Y, w)
+        # On projette Z0 dans ce plan
+        A = np.stack([Y, best_dir], axis=1)
+        coeffs = np.linalg.lstsq(A, Z0, rcond=None)[0]
+        Z_new = A @ coeffs
+        Z_new /= np.linalg.norm(Z_new)
+
+        X_new = np.cross(Z_new, Y)
+        X_new /= np.linalg.norm(X_new)
+
+        return X_new, Y, Z_new
+
+
     # @magicgui(call_button="Calculate Coordinates")
     def calculate_coordinates(self):
         global csv_filename
         points_layer = self.viewer.layers['Points']
+        if "DorsalPoints" in self.viewer.layers:
+            dorsal_points = self.viewer.layers['DorsalPoints'].data
         points = points_layer.data
         if len(points) < 9:
             show_info("You must place at least 9 points.")
@@ -608,6 +700,10 @@ class StereotypingWidget(QWidget):
                                                                                                          PD, self.nouvelle_origine)
             self.u, self.v, self.w = (reoriented_eigvecs[:, 0].copy(), reoriented_eigvecs[:, 1].copy(),
                                       reoriented_eigvecs[:, 2].copy())
+
+            if (self.dorsal_points_checkbox.isChecked() and "DorsalPoints" in self.viewer.layers and
+                    len(self.viewer.layers["DorsalPoints"].data) > 0):
+                self.u, self.v, self.w = self.adjust_Z_in_plane(self.nouvelle_origine, self.v, self.w, dorsal_points)
 
             # Save the computed ellipsoid parameters (centroid and orientation vectors) to a CSV file.
             csv_filename = save_data_to_csv(self.image_paths[self.current_image_index * self.Color_number], (self.nouvelle_origine,
