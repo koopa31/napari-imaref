@@ -236,13 +236,14 @@ class StereotypingWidget(QWidget):
         self.dorsal_points_checkbox.stateChanged.connect(self.toggle_dorsal_points)
         computation_layout.addWidget(self.dorsal_points_checkbox)
 
-        self.show_axes_checkbox = QCheckBox("Show computed orthonormal axes")
+        # On afficher toujours l'ellipsoide et les axes mtn
+        """self.show_axes_checkbox = QCheckBox("Show computed orthonormal axes")
         self.show_axes_checkbox.setToolTip("Show the orthonormal frame axes")
         computation_layout.addWidget(self.show_axes_checkbox)
 
         self.show_ellipsoid_checkbox = QCheckBox("Show the computed ellipsoid")
         self.show_ellipsoid_checkbox.setToolTip("Show a transparent fitted ellipsoid")
-        computation_layout.addWidget(self.show_ellipsoid_checkbox)
+        computation_layout.addWidget(self.show_ellipsoid_checkbox)"""
 
         computation_section.setContentLayout(computation_layout)
         layout.addWidget(computation_section)
@@ -721,17 +722,17 @@ class StereotypingWidget(QWidget):
                 self.viewer.layers.remove("Axe Z")
             if "Origine" in self.viewer.layers:
                 self.viewer.layers.remove("Origine")
-            if self.show_axes_checkbox.isChecked():
-                draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
-                draw_origin(self.viewer, self.nouvelle_origine)
+            #if self.show_axes_checkbox.isChecked():
+            draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
+            draw_origin(self.viewer, self.nouvelle_origine)
             
             if "Ellipsoide" in self.viewer.layers:
                 self.viewer.layers.remove("Ellipsoide")
-            if self.show_ellipsoid_checkbox.isChecked():
-                visualize_ellipsoid(A, self.nouvelle_origine, eigvecs, self.viewer)
+            #if self.show_ellipsoid_checkbox.isChecked():
+            visualize_ellipsoid(A, self.nouvelle_origine, eigvecs, self.viewer)
             
-            if not self.show_axes_checkbox.isChecked() and not self.show_ellipsoid_checkbox.isChecked():
-                self.next_image()
+            """if not self.show_axes_checkbox.isChecked() and not self.show_ellipsoid_checkbox.isChecked():
+                self.next_image()"""
 
 
     def calculate_new_coordinates(self):
