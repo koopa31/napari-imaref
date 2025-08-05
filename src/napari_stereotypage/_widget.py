@@ -362,6 +362,12 @@ class StereotypingWidget(QWidget):
     def invert_x(self):
         if hasattr(self, 'u'):
             self.u = -self.u  # inversion du vecteur X
+            if "Axe X" in self.viewer.layers:
+                self.viewer.layers.remove("Axe X")
+            if "Axe Y" in self.viewer.layers:
+                self.viewer.layers.remove("Axe Y")
+            if "Axe Z" in self.viewer.layers:
+                self.viewer.layers.remove("Axe Z")
             draw_axes(self.viewer, self.nouvelle_origine, self.u, self.v, self.w)
             save_data_to_csv(
                 self.image_paths[self.current_image_index * self.Color_number],
