@@ -195,6 +195,9 @@ class StereotypingWidget(QWidget):
 
         image_selection_layout.addWidget(QLabel("Identifier for blue color:"))
         self.Color_id_blue_input = QLineEdit("CSU-405 Em 440-460")
+        # Remplace la valeur par défaut par un placeHolder grisé
+        """self.Color_id_blue_input = QLineEdit()
+        self.Color_id_blue_input.setPlaceholderText("CSU-405 Em 440-460")"""
         image_selection_layout.addWidget(self.Color_id_blue_input)
 
         image_selection_layout.addWidget(QLabel("Identifier for green color:"))
