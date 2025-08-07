@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Documentation" = "https://stereotyping-doc.readthedocs.io/en/latest/"
+"Documentation" = "https://imaref-doc.readthedocs.io/en/latest/"
 "Bug Tracker" = "https://github.com/koopa31/napari_stereotypage/issues"
 "Source Code" = "https://github.com/koopa31/napari_stereotypage"
 "User Support" = "https://forum.image.sc/"

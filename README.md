@@ -1,4 +1,4 @@
-# napari_stereotypage <img src="https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="200">
+# napari_stereotypage <img src="https://imaref-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="200">
 
 [![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
@@ -61,7 +61,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Apache Software License 2.0]: http://www.apache.org/licenses/LICENSE-2.0
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
-[documentation]: https://stereotyping-doc.readthedocs.io/en/latest/
+[documentation]: https://imaref-doc.readthedocs.io/en/latest/
 [file an issue]: https://github.com/koopa31/napari_stereotypage/issues
 
 [napari]: https://github.com/napari/napari

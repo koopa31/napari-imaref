@@ -337,7 +337,7 @@ class StereotypingWidget(QWidget):
 
         # Set logo if internet connexion works
         """try:
-            logo_url = "https://stereotyping-doc.readthedocs.io/en/latest/_static/logo.png"
+            logo_url = "https://imaref-doc.readthedocs.io/en/latest/_static/logo.png"
             response = requests.get(logo_url)
             if response.status_code == 200:
                 pixmap = QPixmap()
@@ -420,7 +420,7 @@ class StereotypingWidget(QWidget):
 
     def open_doc(self):
         import webbrowser
-        webbrowser.open("https://stereotyping-doc.readthedocs.io/en/latest/index.html#")
+        webbrowser.open("https://imaref-doc.readthedocs.io/en/latest/##")
 
     def select_folder_and_load_image(self):
         '''

@@ -117,7 +117,7 @@ class CoordinateTransformationWidget(QWidget):
 
     def open_doc(self):
         import webbrowser
-        webbrowser.open("https://stereotyping-doc.readthedocs.io/en/latest/index.html#")
+        webbrowser.open("https://imaref-doc.readthedocs.io/en/latest/##")
 
     def load_intro_image(self):
         """

@@ -337,6 +337,11 @@ def draw_axes(viewer, origine, u, v, w):
     - vecteur_v (tuple): Coordonnées du vecteur unitaire v (vx, vy, vz).
     - vecteur_w (tuple): Coordonnées du vecteur unitaire w (wx, wy, wz).
     """
+
+    for name in ["Axe X", "Axe Y", "Axe Z"]:
+        if name in viewer.layers:
+            viewer.layers.remove(name)
+
     # Dessine l'axe x
     segment_u = np.array([origine, origine + 50 * u])
     viewer.add_shapes(segment_u, shape_type='line', edge_width=1, edge_color='blue', name='Axe X')
