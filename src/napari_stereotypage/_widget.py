@@ -516,6 +516,8 @@ class StereotypingWidget(QWidget):
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(cache_dir)
 
+            show_info("Image saved in: {} ".format(extract_dir))
+
         # Get parameters input
         self.Sample_id = str(self.Sample_id_imput.text())
         self.Color_number = int(self.Color_number_imput.text())
