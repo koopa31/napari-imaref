@@ -335,6 +335,11 @@ class StereotypingWidget(QWidget):
         open_doc_button.clicked.connect(self.open_doc)
         layout.addWidget(open_doc_button)
 
+        load_demo_button = QPushButton("Try on demo image")
+        load_demo_button.setToolTip("Load the documentation image to learn how to use the plugin")
+        load_demo_button.clicked.connect(self.load_demo_image)
+        layout.addWidget(load_demo_button)
+
         # Set logo if internet connexion works
         """try:
             logo_url = "https://imaref-doc.readthedocs.io/en/latest/_static/logo.png"
@@ -483,6 +488,68 @@ class StereotypingWidget(QWidget):
                 self.load_image_at_index(0)
             else:
                 show_info("No images found in the folder.")
+
+    def load_demo_image(self):
+        """
+        Télécharge une image 3D multicanal de démonstration depuis Zenodo (si pas déjà présente),
+        la sauvegarde dans le cache utilisateur, et la charge dans Napari.
+        """
+        import zipfile
+        import urllib.request
+        from pathlib import Path
+
+        # 1. Définir les paramètres de l’image de démonstration
+        #TODO: replace by correct image
+        demo_url = "https://zenodo.org/record/7999871/files/Neural_tube_3D.zip"
+        file_hash = "md5:8b459f9224c8f533c97a60b768d4da0a"  # Optionnel si tu veux valider le hash
+        cache_dir = Path.home() / ".cache" / "napari-stereotypage"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = cache_dir / "Neural_tube_3D.zip"
+        extract_dir = cache_dir / "Neural_tube_3D"
+        image_path = extract_dir / "Images" / "neural_tube_3D.tif"
+
+        # 2. Télécharger et extraire si nécessaire
+        if not image_path.exists():
+            show_info("Downloading demo image, please wait...")
+            urllib.request.urlretrieve(demo_url, zip_path)
+
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(cache_dir)
+
+        # Get parameters input
+        self.Sample_id = str(self.Sample_id_imput.text())
+        self.Color_number = int(self.Color_number_imput.text())
+        self.Color_id_green = str(self.Color_id_green_input.text())
+        self.Color_id_blue = str(self.Color_id_blue_input.text())
+        self.Color_id_red = str(self.Color_id_red_input.text())
+        self.folder = os.path.join(cache_dir, "Neural_tube_3D", "Images")
+
+        if self.folder:
+            image_list = [os.path.join(self.folder, f) for f in sorted(os.listdir(self.folder)) if
+                          f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+            self.image_paths = []
+            self.identifier_list = []
+            while len(image_list) > 0:
+                # check for presence of the substring identifying files from the same sample
+                image_test = image_list[0]
+
+                for file in image_list:
+                    # add image corresponding to the same sample to image_paths
+                    self.image_paths.append(file)
+                    image_list.remove(file)
+            self.current_image_index = 0
+            if self.image_paths:
+                self.image_selector.clear()
+                self.total_images = len(self.image_paths) // self.Color_number
+
+                # Add unique sample id to the menu bar
+                self.image_selector.addItems(self.identifier_list)
+
+                # Load first images
+                self.load_image_at_index(0)
+            else:
+                show_info("No images found in the folder.")
+
 
     def load_image(self):
         """
