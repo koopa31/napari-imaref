@@ -489,6 +489,10 @@ class StereotypingWidget(QWidget):
             else:
                 show_info("No images found in the folder.")
 
+        # Réinitialiser les cases qui changent z et x
+        self.invert_x_checkbox.setChecked(False)
+        self.dorsal_points_checkbox.setChecked(False)
+
     def load_demo_image(self):
         """
         Télécharge une image 3D multicanal de démonstration depuis Zenodo (si pas déjà présente),
@@ -551,6 +555,10 @@ class StereotypingWidget(QWidget):
                 self.load_image_at_index(0)
             else:
                 show_info("No images found in the folder.")
+
+        # Réinitialiser les cases qui changent z et x
+        self.invert_x_checkbox.setChecked(False)
+        self.dorsal_points_checkbox.setChecked(False)
 
 
     def load_image(self):
@@ -885,6 +893,10 @@ class StereotypingWidget(QWidget):
 
         # Réinitialiser les instructions
         self.update_instructions(0)
+
+        # Réinitialiser les cases qui changent z et x
+        self.invert_x_checkbox.setChecked(False)
+        self.dorsal_points_checkbox.setChecked(False)
 
     def load_image_at_index(self, index):
         """Load the image at the specified index and update UI elements."""
