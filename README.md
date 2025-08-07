@@ -39,8 +39,9 @@ A [documentation] is available to understand how to effectively learn how to use
 
 ## Contributing
 
-Contributions are very welcome. Tests can be run with [tox], please ensure
-the coverage at least stays the same before you submit a pull request.
+Contributions are very welcome. If you manage to apply this method to other sample types, we’d love to hear about it! 
+And if you’re considering adapting it to different biological systems but feel that a few modifications might be necessary,
+don’t hesitate to reach out.
 
 ## License
 
