@@ -1,4 +1,4 @@
-# from napari_stereotypage import make_sample_data
+# from napari_imaref import make_sample_data
 
 # add your tests here...
 

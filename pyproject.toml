@@ -1,5 +1,5 @@
 [project]
-name = "napari-stereotypage"
+name = "napari-imaref"
 dynamic = ["version"]
 description = "Stereotyping zebrafish embryos by manually setting a reference frame"
 readme = "README.md"
@@ -35,8 +35,8 @@ dependencies = [
 
 [project.urls]
 "Documentation" = "https://imaref-doc.readthedocs.io/en/latest/"
-"Bug Tracker" = "https://github.com/koopa31/napari_stereotypage/issues"
-"Source Code" = "https://github.com/koopa31/napari_stereotypage"
+"Bug Tracker" = "https://github.com/koopa31/napari-imaref/issues"
+"Source Code" = "https://github.com/koopa31/napari-imaref"
 "User Support" = "https://forum.image.sc/"
 
 [project.optional-dependencies]
@@ -50,7 +50,7 @@ testing = [
 ]
 
 [project.entry-points."napari.manifest"]
-napari-stereotypage = "napari_stereotypage:napari.yaml"
+napari-imaref = "napari_imaref:napari.yaml"
 
 
 
@@ -65,12 +65,12 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-"napari_stereotypage" = ["Image/*.webp"]  # Inclure les fichiers webp du dossier image
+"napari_imaref" = ["Image/*.webp"]  # Inclure les fichiers webp du dossier image
 "*" = ["*.yaml"]
 
 
 [tool.setuptools.dynamic]
-version = {attr = "napari_stereotypage.__init__.__version__"}
+version = {attr = "napari_imaref.__init__.__version__"}
 
 [tool.black]
 line-length = 79

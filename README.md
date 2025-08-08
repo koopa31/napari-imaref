@@ -1,17 +1,17 @@
-# napari_stereotypage <img src="https://imaref-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="200">
+# napari-imaref <img src="https://imaref-doc.readthedocs.io/en/latest/_static/logo.png" align="right" width="200">
 
-[![License BSD-3](https://img.shields.io/pypi/l/napari_stereotypage.svg?color=green)](https://github.com/koopa31/napari_stereotypage/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari_stereotypage.svg?color=green)](https://pypi.org/project/napari_stereotypage)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari_stereotypage.svg?color=green)](https://python.org)
-[![tests](https://github.com/koopa31/napari_stereotypage/workflows/tests/badge.svg)](https://github.com/koopa31/napari_stereotypage/actions)
-[![codecov](https://codecov.io/gh/koopa31/napari_stereotypage/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari_stereotypage)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari_stereotypage)](https://napari-hub.org/plugins/napari_stereotypage)
+[![License BSD-3](https://img.shields.io/pypi/l/napari-imaref.svg?color=green)](https://github.com/koopa31/napari-imaref/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napari-imaref.svg?color=green)](https://pypi.org/project/napari-imaref)
+[![Python Version](https://img.shields.io/pypi/pyversions/napari-imaref.svg?color=green)](https://python.org)
+[![tests](https://github.com/koopa31/napari-imaref/workflows/tests/badge.svg)](https://github.com/koopa31/napari-imaref/actions)
+[![codecov](https://codecov.io/gh/koopa31/napari-imaref/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari-imaref)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-imaref)](https://napari-hub.org/plugins/napari-imaref)
 
 Stereotyping 3D images of the zebrafish olfactory system by defining a reproducible reference frame. 
 The method relies on ellipsoid fitting based on manually placed landmark points.
 
 
-![](https://github.com/koopa31/stereotyping_doc/blob/main/docs/images/placer_points.gif?raw=true)
+![](https://github.com/koopa31/ImaRef_doc/blob/main/docs/images/placer_points.gif?raw=true)
 
 ----------------------------------
 
@@ -27,9 +27,9 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-You can install `napari_stereotypage` via [pip]:
+You can install `napari-imaref` via [pip]:
 
-    pip install napari_stereotypage
+    pip install napari-imaref
 
 
 ## Documentation
@@ -46,7 +46,7 @@ don’t hesitate to reach out.
 ## License
 
 Distributed under the terms of the [BSD-3] license,
-"napari_stereotypage" is free and open source software
+"napari-imaref" is free and open source software
 
 ## Issues
 
@@ -63,7 +63,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 [documentation]: https://imaref-doc.readthedocs.io/en/latest/
-[file an issue]: https://github.com/koopa31/napari_stereotypage/issues
+[file an issue]: https://github.com/koopa31/napari-imaref/issues
 
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
