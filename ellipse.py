@@ -328,6 +328,63 @@ def orienter_axes(eigvecs, PA, PD, origine):
 
     return u, v, w
 
+def adjust_Z_in_plane(O, Y, Z0, points):
+    if hasattr(points, 'data'):
+        points = points.data
+
+    Y = Y / np.linalg.norm(Y)
+    Z0 = Z0 / np.linalg.norm(Z0)
+
+    # On cherche le plan passant par O et contenant Y et une direction w (⊥ Y)
+    # Pour ce faire, on cherche le vecteur w (⊥ Y) qui minimise la distance au nuage
+    # Méthode : trouver le plan contenant Y et qui a une normale N minimisant les distances
+
+    # Centrer les points
+    delta = points - O
+
+    # Générer base complète (Y, B1, B2) : B1, B2 dans plan orthogonal à Y
+    # Par défaut, on utilise Z0 pour construire B1 (orthogonal à Y)
+    B1 = Z0 - (Z0 @ Y) * Y
+    if np.linalg.norm(B1) < 1e-8:
+        B1 = np.array([1, 0, 0]) if abs(Y[0]) < 0.9 else np.array([0, 1, 0])
+        B1 = B1 - (B1 @ Y) * Y
+    B1 /= np.linalg.norm(B1)
+    B2 = np.cross(Y, B1)
+
+    # On cherche une direction dans le plan orthogonal à Y :
+    # direction = cos(θ) * B1 + sin(θ) * B2
+
+    best_theta = None
+    min_total_distance = np.inf
+    best_dir = None
+
+    for theta in np.linspace(0, 2 * np.pi, 360):
+        w = np.cos(theta) * B1 + np.sin(theta) * B2
+        # Le plan est span(Y, w), on peut obtenir sa normale :
+        N = np.cross(Y, w)
+        N = N / np.linalg.norm(N)
+
+        # Calcul de la distance orthogonale de chaque point au plan
+        distances = np.abs(delta @ N)
+        total = np.mean(distances)
+
+        if total < min_total_distance:
+            min_total_distance = total
+            best_theta = theta
+            best_dir = w
+
+    # Maintenant on a la meilleure direction w ⇒ plan optimal = span(Y, w)
+    # On projette Z0 dans ce plan
+    A = np.stack([Y, best_dir], axis=1)
+    coeffs = np.linalg.lstsq(A, Z0, rcond=None)[0]
+    Z_new = A @ coeffs
+    Z_new /= np.linalg.norm(Z_new)
+
+    X_new = np.cross(Z_new, Y)
+    X_new /= np.linalg.norm(X_new)
+
+    return X_new, Y, Z_new
+
 
 ### SENSITIVITY ANALYSIS ###
 
@@ -566,6 +623,8 @@ def test_sensitivity_multiple_std(points, PA, PD, std_values, n_simulations=50, 
 
     eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs,PA, PD, centroid)
 
+    eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = adjust_Z_in_plane(centroid, eigvecs[:, 1], eigvecs[:, 2], PD)
+
     axes_lengths = np.sqrt(1 / eigvals)
 
     for std in std_values:
@@ -592,6 +651,8 @@ def test_sensitivity_multiple_std(points, PA, PD, std_values, n_simulations=50, 
 
             eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(eigvecs_perturbed,
                                                                                         PA, PD, centroid_perturbed)
+
+            eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = adjust_Z_in_plane(centroid_perturbed, eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2], PD)
 
             axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
 
@@ -1159,6 +1220,9 @@ def test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulat
 
                 eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs, PA, PD, centroid_ref)
 
+                eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = adjust_Z_in_plane(centroid_ref, eigvecs[:, 1], eigvecs[:, 2],
+                                                                                PD)
+
                 for _ in range(m_noise_simulations):  # Itération sur les perturbations de bruit
                     perturbed_points = perturb_points_anisotropic(subset_points, std, voxel_size, isotropic)
 
@@ -1178,6 +1242,9 @@ def test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, n_simulat
 
                     eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(
                         eigvecs_perturbed, PA, PD, centroid_perturbed)
+
+                    eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = adjust_Z_in_plane(centroid_perturbed, eigvecs_perturbed[:, 1],
+                                                                                    eigvecs_perturbed[:, 2], PD)
 
                     axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
                     angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
@@ -1232,6 +1299,8 @@ def parallel_test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, 
 
         eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = orienter_axes(eigvecs, PA, PD, centroid_ref)
 
+        eigvecs[:, 0], eigvecs[:, 1], eigvecs[:, 2] = adjust_Z_in_plane(centroid_ref, eigvecs[:, 1], eigvecs[:, 2], PD)
+
         results = {
             "centroids": [],
             "axes_lengths": [],
@@ -1258,6 +1327,8 @@ def parallel_test_sensitivity_subset(points, PA, PD, subset_ratios, std_values, 
 
             eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = orienter_axes(
                 eigvecs_perturbed, PA, PD, centroid_perturbed)
+
+            eigvecs_perturbed[:, 0], eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2] = adjust_Z_in_plane(centroid_perturbed, eigvecs_perturbed[:, 1], eigvecs_perturbed[:, 2], PD)
 
             axes_lengths_perturbed = np.sqrt(1 / eigvals_perturbed)
             angles_deviation = compute_orientation_deviation(eigvecs, eigvecs_perturbed)
