@@ -119,7 +119,7 @@ if __name__ == "__main__":
     ax.set_title('Ellipsoïde 3D')
 
     psi = np.linspace(-np.pi / 2, np.pi / 2, 16)
-    bruit = 0.3
+    bruit = 0.1
     lpx = []
     lpy = []
     lpz = []

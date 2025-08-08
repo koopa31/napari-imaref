@@ -35,7 +35,7 @@ def custom_exception_handler(exc_type, exc_value, exc_traceback):
 sys.excepthook = custom_exception_handler
 
 
-def check_for_update(plugin_name="napari-stereotypage", viewer=None):
+def check_for_update(plugin_name="napari-imaref", viewer=None):
     try:
         # Get the installed version of the plugin
         current_version = importlib.metadata.version(plugin_name)
@@ -362,7 +362,7 @@ class StereotypingWidget(QWidget):
         self.setLayout(layout)
         self.update_instructions(0)
 
-        check_for_update(plugin_name="napari-stereotypage", viewer=self.viewer)
+        check_for_update(plugin_name="napari-imaref", viewer=self.viewer)
 
     def invert_x(self):
         if hasattr(self, 'u'):
@@ -506,7 +506,7 @@ class StereotypingWidget(QWidget):
         #TODO: replace by correct image
         demo_url = "https://zenodo.org/record/7999871/files/Neural_tube_3D.zip"
         file_hash = "md5:8b459f9224c8f533c97a60b768d4da0a"  # Optionnel si tu veux valider le hash
-        cache_dir = Path.home() / ".cache" / "napari-stereotypage"
+        cache_dir = Path.home() / ".cache" / "napari-imaref"
         cache_dir.mkdir(parents=True, exist_ok=True)
         zip_path = cache_dir / "Neural_tube_3D.zip"
         extract_dir = cache_dir / "Neural_tube_3D"

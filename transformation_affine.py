@@ -189,7 +189,7 @@ napari.run()
 
 # === Traitement de tout un dossier === 
 
-input_dir = Path("/home/clement/Images/caracterisation_16hpf")
+input_dir = Path("/home/clement/Images/Caractérisation/caracterisation_16hpf")
 images = sorted([
     f for ext in ("*.tif", "*.TIF")
     for f in input_dir.glob(ext)

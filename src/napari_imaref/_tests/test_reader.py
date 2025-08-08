@@ -1,6 +1,6 @@
 import numpy as np
 
-from napari_stereotypage import napari_get_reader
+from napari_imaref import napari_get_reader
 
 
 # tmp_path is a pytest fixture

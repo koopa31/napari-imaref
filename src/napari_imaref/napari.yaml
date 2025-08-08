@@ -1,0 +1,37 @@
+name: napari-imaref
+display_name: Napari ImaRef
+visibility: public
+categories: ["Annotation", "Segmentation", "Acquisition"]
+contributions:
+  commands:
+    - id: napari-imaref.get_reader
+      python_name: napari_imaref._reader:napari_get_reader
+      title: Open data with Napari Stereotyping
+    - id: napari-imaref.write_multiple
+      python_name: napari_imaref._writer:write_multiple
+      title: Save multi-layer data with Napari Stereotyping
+    - id: napari-imaref.write_single_image
+      python_name: napari_imaref._writer:write_single_image
+      title: Save image data with Napari Stereotyping
+    - id: napari-imaref.make_stereotyping_widget
+      python_name: napari_imaref._widget:StereotypingWidget
+      title: Stereotyping Widget
+    - id: napari-imaref.make_points_transformation_widget
+      python_name: napari_imaref._points_transformation_widget:CoordinateTransformationWidget
+      title: Coordinates Transformation Widget
+  readers:
+    - command: napari-imaref.get_reader
+      accepts_directories: false
+      filename_patterns: ['*.npy']
+  writers:
+    - command: napari-imaref.write_multiple
+      layer_types: ['image*','labels*']
+      filename_extensions: []
+    - command: napari-imaref.write_single_image
+      layer_types: ['image']
+      filename_extensions: ['.npy']
+  widgets:
+    - command: napari-imaref.make_stereotyping_widget
+      display_name: Stereotyping Widget
+    - command: napari-imaref.make_points_transformation_widget
+      display_name: Coordinates Transformation Widget

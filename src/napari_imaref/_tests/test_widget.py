@@ -1,6 +1,6 @@
 import numpy as np
 
-from napari_stereotypage._widget import (
+from napari_imaref._widget import (
     ExampleQWidget,
     ImageThreshold,
     threshold_autogenerate_widget,
