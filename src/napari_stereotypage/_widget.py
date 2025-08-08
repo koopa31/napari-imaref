@@ -833,6 +833,8 @@ class StereotypingWidget(QWidget):
             """if not self.show_axes_checkbox.isChecked() and not self.show_ellipsoid_checkbox.isChecked():
                 self.next_image()"""
 
+            if self.invert_x_checkbox.isChecked():
+                self.invert_x()
 
     def calculate_new_coordinates(self):
         """if "Plan" in self.viewer.layers:
