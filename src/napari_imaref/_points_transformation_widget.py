@@ -126,7 +126,7 @@ class CoordinateTransformationWidget(QWidget):
         if len(self.viewer.layers) != 0:
             self.viewer.layers.clear()
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        image_path = os.path.join(script_dir, "Image", "instructions.webp")
+        image_path = os.path.join(script_dir, "Image", "Imaref_TransformCoordinates_Instructions_black.png")
         if os.path.exists(image_path):
             im_accueil = imread(image_path)
             self.viewer.add_image(im_accueil, name="Intro Image")
