@@ -201,7 +201,7 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             points_csv_path = os.path.join(input_folder, point_file)
-            ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
             newpoints_csv_path = os.path.join(input_folder, base_name + "_newpoints.csv")
 
             # Ensure the reference CSV exists
@@ -254,7 +254,7 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(mask_files)))
             base_name = mask_file.replace((self.file_identifier + ".tif"), "")
             mask_path = os.path.join(input_folder, mask_file)
-            ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(ref_csv_path):
@@ -300,7 +300,7 @@ class CoordinateTransformationWidget(QWidget):
                 self.progress_bar.setValue(int(100*index/len(point_files)))
                 base_name = point_file.replace((self.file_identifier + ".csv"), "")
                 tracks_csv_path = os.path.join(input_folder, point_file)
-                ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+                ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
 
                 # Ensure the reference CSV exists
                 if not os.path.exists(os.path.join(input_folder, ref_csv_path)):
@@ -335,7 +335,7 @@ class CoordinateTransformationWidget(QWidget):
                 base_name = xml_file.replace((self.file_identifier + ".xml"), "")
                 xml_path = os.path.join(input_folder, xml_file)
                 first_image_index = xml_file.split("<")[1].split("-")[0]
-                ref_csv_path = os.path.join(input_folder, xml_file.split("<")[0] + first_image_index + ".csv")
+                ref_csv_path = os.path.join(input_folder, xml_file.split("<")[0] + first_image_index + "_imaref.csv")
 
                 # Ensure the reference CSV exists
                 if not os.path.exists(ref_csv_path):
@@ -392,7 +392,7 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
-            ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(os.path.join(input_folder, ref_csv_path)):
@@ -437,7 +437,7 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             tracks_csv_path = os.path.join(input_folder, point_file)
-            ref_csv_path = os.path.join(input_folder, base_name + ".csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(os.path.join(input_folder, ref_csv_path)):
