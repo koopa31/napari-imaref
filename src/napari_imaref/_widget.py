@@ -610,7 +610,7 @@ class StereotypingWidget(QWidget):
 
         #Ajoute un repere et une ellipsoide si déja calcules
         csv_name = self.image_paths[start_index]
-        csv_name = csv_name.rsplit('.',1)[0] + '.csv'
+        csv_name = csv_name.rsplit('.',1)[0] + '_imaref.csv'
         csv_name = os.path.split(csv_name)[1]
         if csv_name in os.listdir(self.folder):
             df = pd.read_csv(os.path.join(self.folder,csv_name), header=None)

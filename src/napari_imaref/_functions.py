@@ -318,7 +318,7 @@ def save_data_to_csv(image_path, data):
     - data (tuple): Données contenant l'origine et les vecteurs u, v, w.
     """
     global csv_filename
-    csv_filename = os.path.splitext(image_path)[0] + '.csv'
+    csv_filename = os.path.splitext(image_path)[0] + '_imaref.csv'
     with open(csv_filename, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
         csv_writer.writerow(['Origine', 'u', 'v', 'w'])
