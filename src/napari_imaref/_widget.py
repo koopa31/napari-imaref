@@ -897,7 +897,12 @@ class StereotypingWidget(QWidget):
         self.update_instructions(0)
 
         # Réinitialiser les cases qui changent z et x
+        self.invert_x_checkbox.blockSignals(True)
         self.invert_x_checkbox.setChecked(False)
+        self.invert_x_checkbox.blockSignals(False)
+        # pour ne plus qu'il puisse modifier x de l'image précédente tant qu'on a pas calculé un nouveau repère
+        del self.u
+
         self.dorsal_points_checkbox.setChecked(False)
 
     def load_image_at_index(self, index):
