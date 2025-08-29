@@ -229,10 +229,13 @@ class CoordinateTransformationWidget(QWidget):
             transformed_points = transform_points(points, origin, u, v, w)
 
             # Add new columns to the original DataFrame
-            df[["Z_new", "Y_new", "X_new"]] = transformed_points
+            # df[["Z_new", "Y_new", "X_new"]] = transformed_points
 
             # Save the updated CSV
-            df.to_csv(newpoints_csv_path, index=False)
+            pd.DataFrame(transformed_points, columns=["axis-0", "axis-1", "axis-2"]).to_csv(newpoints_csv_path,
+                                                                                            index=True,
+                                                                                            index_label="index")
+            # df.to_csv(newpoints_csv_path, index=False)
             print(f"✅ Transformed points saved in {newpoints_csv_path}")
 
     # SECTION 2
@@ -368,9 +371,9 @@ class CoordinateTransformationWidget(QWidget):
 
                 # Update XML with new transformed coordinates
                 for spot, new_coords in zip(spots, transformed_points):
-                    spot.set("NEW_POSITION_X", str(new_coords[0]))
+                    spot.set("NEW_POSITION_Z", str(new_coords[0]))
                     spot.set("NEW_POSITION_Y", str(new_coords[1]))
-                    spot.set("NEW_POSITION_Z", str(new_coords[2]))
+                    spot.set("NEW_POSITION_X", str(new_coords[2]))
 
                 # Overwrite the original XML file
                 tree.write(xml_path, encoding="utf-8", xml_declaration=True)
@@ -457,7 +460,7 @@ class CoordinateTransformationWidget(QWidget):
             transformed_points = transform_points(points, origin, u, v, w)
 
             # Add new columns to the original DataFrame
-            df[["x_new", "y_new", "z_new"]] = transformed_points
+            df[["z_new", "y_new", "x_new"]] = transformed_points
 
             # Save the updated CSV
             df.to_csv(tracks_csv_path, index=False)
