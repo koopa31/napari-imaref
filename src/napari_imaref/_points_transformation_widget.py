@@ -201,8 +201,8 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(point_files)))
             base_name = point_file.replace((self.file_identifier + ".csv"), "")
             points_csv_path = os.path.join(input_folder, point_file)
-            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
-            newpoints_csv_path = os.path.join(input_folder, base_name + "_newpoints.csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "imaref.csv")
+            newpoints_csv_path = os.path.join(input_folder, base_name + "newpoints.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(ref_csv_path):
@@ -229,7 +229,7 @@ class CoordinateTransformationWidget(QWidget):
             transformed_points = transform_points(points, origin, u, v, w)
 
             # Add new columns to the original DataFrame
-            df[["X_new", "Y_new", "Z_new"]] = transformed_points
+            df[["Z_new", "Y_new", "X_new"]] = transformed_points
 
             # Save the updated CSV
             df.to_csv(newpoints_csv_path, index=False)
@@ -254,7 +254,7 @@ class CoordinateTransformationWidget(QWidget):
             self.progress_bar.setValue(int(100*index/len(mask_files)))
             base_name = mask_file.replace((self.file_identifier + ".tif"), "")
             mask_path = os.path.join(input_folder, mask_file)
-            ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
+            ref_csv_path = os.path.join(input_folder, base_name + "imaref.csv")
 
             # Ensure the reference CSV exists
             if not os.path.exists(ref_csv_path):
@@ -276,7 +276,7 @@ class CoordinateTransformationWidget(QWidget):
             transformed_centroids = transformed_centroids[:, [2, 1, 0]]
 
             # Save the transformed centroids
-            output_csv_path = os.path.join(input_folder, base_name + "_cells_coordinates.csv")
+            output_csv_path = os.path.join(input_folder, base_name + "cells_coordinates.csv")
             pd.DataFrame(transformed_centroids, columns=["axis-0", "axis-1", "axis-2"]).to_csv(output_csv_path,
                                                                                             index=True,
                                                                                             index_label="index")
@@ -300,7 +300,7 @@ class CoordinateTransformationWidget(QWidget):
                 self.progress_bar.setValue(int(100*index/len(point_files)))
                 base_name = point_file.replace((self.file_identifier + ".csv"), "")
                 tracks_csv_path = os.path.join(input_folder, point_file)
-                ref_csv_path = os.path.join(input_folder, base_name + "_imaref.csv")
+                ref_csv_path = os.path.join(input_folder, base_name + "imaref.csv")
 
                 # Ensure the reference CSV exists
                 if not os.path.exists(os.path.join(input_folder, ref_csv_path)):
