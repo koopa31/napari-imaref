@@ -227,6 +227,9 @@ class CoordinateTransformationWidget(QWidget):
 
             # Transform the points
             transformed_points = transform_points(points, origin, u, v, w)
+            #put back the coordinates in the [z,y,x] order for consistency with napari
+            transformed_points[:,[0,2]] = transformed_points[:,[2,0]]
+            
 
             # Add new columns to the original DataFrame
             # df[["Z_new", "Y_new", "X_new"]] = transformed_points
@@ -276,7 +279,7 @@ class CoordinateTransformationWidget(QWidget):
 
             # Transform centroids
             transformed_centroids = transform_points(centroids, origin, u, v, w)
-            transformed_centroids = transformed_centroids[:, [0, 1, 2]]
+            transformed_centroids = transformed_centroids[:, [2, 1, 0]]
 
             # Save the transformed centroids
             output_csv_path = os.path.join(input_folder, base_name + "cells_coordinates.csv")
