@@ -27,9 +27,20 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
-You can install `napari-imaref` via [pip]:
+You can install `napari-imaref` via [pip] following these steps:
 
-    pip install napari-imaref
+1) First create a Conda environment
+
+       conda create -n napari_stereotyping python=3.11
+2) Activate the Conda environment
+       
+       conda activate napari_stereotyping
+3) Then install Napari (Napari versions after 0.6.6 are not compatible with the plugin.)
+
+       pip install "napari[all]"==0.6.6
+4) Install the plugin 
+   
+       pip install napari-imaref
 
 
 ## Documentation
