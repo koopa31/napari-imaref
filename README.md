@@ -7,7 +7,7 @@
 [![codecov](https://codecov.io/gh/koopa31/napari-imaref/branch/main/graph/badge.svg)](https://codecov.io/gh/koopa31/napari-imaref)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-imaref)](https://napari-hub.org/plugins/napari-imaref)
 
-Stereotyping 3D images of the zebrafish olfactory system by defining a reproducible reference frame. 
+Stereotyping 3D images by defining a reproducible reference frame. 
 The method relies on ellipsoid fitting based on manually placed landmark points.
 
 
